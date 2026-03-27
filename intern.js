@@ -97,6 +97,7 @@ async function fetchExam(payload) {
 function renderTopics(list) {
   const wrap = el("topicsWrap");
   wrap.innerHTML = "";
+
   list.forEach(topic => {
     const item = document.createElement("div");
     item.className = "topic-item";
@@ -146,9 +147,11 @@ function startTimer(minutes) {
   stopTimer();
   state.remainingSeconds = minutes * 60;
   el("timerText").textContent = formatTime(state.remainingSeconds);
+
   state.timerId = setInterval(() => {
     state.remainingSeconds -= 1;
     el("timerText").textContent = formatTime(Math.max(0, state.remainingSeconds));
+
     if (state.remainingSeconds <= 0) {
       stopTimer();
       submitExam();
@@ -180,6 +183,7 @@ function renderQuestion() {
         <h2>${state.current + 1}) ${escapeHtml(q.question)}</h2>
         <p class="muted">${escapeHtml(q.topic)} • ${escapeHtml(q.difficulty)}</p>
       </div>
+
       <button id="bookmarkBtn" class="bookmark-btn ${bookmarked ? "active" : ""}" type="button">
         ${bookmarked ? "★ Bookmarked" : "☆ Bookmark"}
       </button>
@@ -193,7 +197,6 @@ function renderQuestion() {
     ` : ""}
 
     <div id="optionList" class="option-list"></div>
-
     <div id="practiceExtras"></div>
 
     <div class="action-row" style="margin-top:18px;">
@@ -203,6 +206,7 @@ function renderQuestion() {
   `;
 
   const optionList = el("optionList");
+
   q.options.forEach(opt => {
     const btn = document.createElement("button");
     btn.type = "button";
@@ -265,6 +269,7 @@ function showPracticeAnswer(q) {
       <strong>Correct Answer:</strong> ${escapeHtml(correct)}
       <div style="margin-top:8px;">${escapeHtml(q.explanation || "No explanation available.")}</div>
     </div>
+
     <div class="summary-box">
       <strong>Quick Summary</strong>
       <div style="margin-top:8px;">${escapeHtml(q.summary || "No summary available.")}</div>
@@ -276,6 +281,7 @@ function buildReviewRows() {
   state.reviewRows = state.questions.map(q => {
     const selected = state.answers[q.id] || "No answer selected";
     const correct = q.correctAnswer;
+
     return {
       question: q,
       selected,
@@ -308,10 +314,12 @@ function renderReview() {
       <p class="${row.isCorrect ? "status-correct" : "status-wrong"}">
         ${row.isCorrect ? "Correct" : "Wrong"}
       </p>
+
       <div class="answer-box">
         <strong>Explanation</strong>
         <div style="margin-top:8px;">${escapeHtml(row.question.explanation || "No explanation available.")}</div>
       </div>
+
       <div class="summary-box">
         <strong>Quick Summary</strong>
         <div style="margin-top:8px;">${escapeHtml(row.question.summary || "No summary available.")}</div>
@@ -322,20 +330,25 @@ function renderReview() {
 
 function retryWrong() {
   const wrong = state.reviewRows.filter(r => !r.isCorrect).map(r => r.question);
+
   if (!wrong.length) {
     alert("No wrong questions to retry.");
     return;
   }
+
   state.questions = wrong;
   state.current = 0;
   state.answers = {};
   state.reviewRows = [];
+
   el("reviewShell").classList.add("hidden");
   el("examShell").classList.remove("hidden");
   el("modeBadge").textContent = "Retry Wrong";
+
   if (state.mode === "exam") {
     startTimer(Number(el("minutes").value || 20));
   }
+
   renderQuestion();
 }
 
@@ -352,11 +365,7 @@ async function startExam() {
       return;
     }
 
-    const exam = await fetchExam({
-      topics,
-      count,
-      difficulty
-    });
+    const exam = await fetchExam({ topics, count, difficulty });
 
     state.questions = exam;
     state.current = 0;
