@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Intern Admin</title>
+  <link rel="stylesheet" href="./intern.css" />
+</head>
+<body>
+  <div class="container">
+    <header class="topbar">
+      <h1>Intern Admin Panel ⚙️</h1>
+      <p class="muted">Add, edit, delete, and manage intern questions.</p>
+    </header>
+
+    <section class="card">
+      <label>Admin Password</label>
+      <input id="adminPassword" type="password" placeholder="Enter admin password" />
+    </section>
+
+    <section class="card">
+      <h2>Add / Edit Question</h2>
+
+      <input id="questionId" type="hidden" />
+
+      <div class="grid two">
+        <div>
+          <label>Topic</label>
+          <input id="topic" type="text" placeholder="cardio" />
+        </div>
+        <div>
+          <label>Difficulty</label>
+          <select id="difficulty">
+            <option value="easy">easy</option>
+            <option value="medium" selected>medium</option>
+            <option value="hard">hard</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <label>Case Scenario</label>
+        <textarea id="caseScenario" rows="4"></textarea>
+      </div>
+
+      <div class="row">
+        <label>Question</label>
+        <textarea id="question" rows="3"></textarea>
+      </div>
+
+      <div class="grid two">
+        <div>
+          <label>Option 1</label>
+          <input id="opt1" type="text" />
+        </div>
+        <div>
+          <label>Option 2</label>
+          <input id="opt2" type="text" />
+        </div>
+        <div>
+          <label>Option 3</label>
+          <input id="opt3" type="text" />
+        </div>
+        <div>
+          <label>Option 4</label>
+          <input id="opt4" type="text" />
+        </div>
+      </div>
+
+      <div class="row">
+        <label>Correct Answer</label>
+        <input id="correctAnswer" type="text" />
+      </div>
+
+      <div class="row">
+        <label>Explanation</label>
+        <textarea id="explanation" rows="4"></textarea>
+      </div>
+
+      <div class="row">
+        <label>Summary</label>
+        <textarea id="summary" rows="3"></textarea>
+      </div>
+
+      <div class="small-row" style="margin-top:16px;">
+        <button id="saveBtn" class="primary-btn" type="button">Save Question</button>
+        <button id="clearBtn" class="mini-btn" type="button">Clear</button>
+      </div>
+
+      <div id="adminMessage" class="row"></div>
+    </section>
+
+    <section class="card">
+      <div class="review-head">
+        <div>
+          <h2>Questions</h2>
+        </div>
+        <div class="small-row">
+          <input id="filterTopic" type="text" placeholder="Filter by topic" />
+          <button id="loadBtn" class="mini-btn" type="button">Load</button>
+        </div>
+      </div>
+      <div id="questionList" class="review-list"></div>
+    </section>
+  </div>
+
+  <script src="./admin.js"></script>
+</body>
+</html>

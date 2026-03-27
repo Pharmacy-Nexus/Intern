@@ -1,38 +1,106 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Intern Mode</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="./intern.css" />
 </head>
-
 <body>
+  <div class="container">
+    <header class="topbar">
+      <h1>Intern Mode 🔥</h1>
+      <p class="muted">Practice mode for learning. Real Exam mode for full simulation.</p>
+    </header>
 
-<div class="container">
+    <section id="setupCard" class="card">
+      <div class="grid two">
+        <div>
+          <label>Mode</label>
+          <select id="mode">
+            <option value="practice">Practice Mode</option>
+            <option value="exam">Real Exam Mode</option>
+          </select>
+        </div>
+        <div>
+          <label>Difficulty</label>
+          <select id="difficulty">
+            <option value="all">All</option>
+            <option value="easy">Easy</option>
+            <option value="medium">Medium</option>
+            <option value="hard">Hard</option>
+          </select>
+        </div>
+      </div>
 
-  <h2>Intern Mode 🔥</h2>
+      <div class="grid two">
+        <div>
+          <label>Number of Questions</label>
+          <input id="count" type="number" min="1" max="100" value="10" />
+        </div>
+        <div>
+          <label>Timer (minutes)</label>
+          <input id="minutes" type="number" min="1" max="180" value="20" />
+        </div>
+      </div>
 
-  <div id="setup">
-    <label>Topics</label>
-    <input id="topics" placeholder="cardio,renal">
+      <div class="topic-block">
+        <div class="topic-head">
+          <label>Topics</label>
+          <div class="small-row">
+            <button id="selectAllBtn" type="button" class="mini-btn">Select All</button>
+            <button id="clearAllBtn" type="button" class="mini-btn">Clear All</button>
+          </div>
+        </div>
+        <input id="topicSearch" type="text" placeholder="Search topics..." />
+        <div id="topicsWrap" class="topics-wrap"></div>
+      </div>
 
-    <label>عدد الأسئلة</label>
-    <input id="count" type="number" value="10">
+      <div class="row">
+        <button id="startBtn" class="primary-btn" type="button">Start</button>
+      </div>
 
-    <label>Mode</label>
-    <select id="mode">
-      <option value="practice">Practice</option>
-      <option value="exam">Exam</option>
-    </select>
+      <div id="setupMessage"></div>
+    </section>
 
-    <button onclick="start()">Start</button>
+    <section id="examShell" class="hidden">
+      <aside class="sidebar card">
+        <div class="pill" id="modeBadge">Mode</div>
+        <div class="timer" id="timerText">00:00</div>
+        <div class="muted">Time remaining</div>
+
+        <div class="progress-wrap">
+          <div class="progress-bar">
+            <div id="progressFill" class="progress-fill"></div>
+          </div>
+          <div id="progressText" class="muted small"></div>
+        </div>
+
+        <div class="row">
+          <button id="submitBtn" class="danger-btn" type="button">Submit</button>
+        </div>
+      </aside>
+
+      <main id="questionArea" class="card question-area"></main>
+    </section>
+
+    <section id="reviewShell" class="hidden">
+      <div class="card">
+        <div class="review-head">
+          <div>
+            <h2>Review</h2>
+            <p id="reviewScore" class="muted"></p>
+          </div>
+          <div class="small-row">
+            <button id="retryWrongBtn" class="mini-btn" type="button">Retry Wrong</button>
+            <button id="backSetupBtn" class="mini-btn" type="button">Back to Setup</button>
+          </div>
+        </div>
+        <div id="reviewList" class="review-list"></div>
+      </div>
+    </section>
   </div>
 
-  <div id="exam"></div>
-
-</div>
-
-<script src="intern.js"></script>
-
+  <script src="./intern.js"></script>
 </body>
 </html>
