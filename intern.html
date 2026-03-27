@@ -16,14 +16,15 @@
     <section id="setupCard" class="card">
       <div class="grid two">
         <div>
-          <label>Mode</label>
+          <label for="mode">Mode</label>
           <select id="mode">
             <option value="practice">Practice Mode</option>
             <option value="exam">Real Exam Mode</option>
           </select>
         </div>
+
         <div>
-          <label>Difficulty</label>
+          <label for="difficulty">Difficulty</label>
           <select id="difficulty">
             <option value="all">All</option>
             <option value="easy">Easy</option>
@@ -35,11 +36,12 @@
 
       <div class="grid two">
         <div>
-          <label>Number of Questions</label>
-          <input id="count" type="number" min="1" max="100" value="10" />
+          <label for="count">Number of Questions</label>
+          <input id="count" type="number" min="1" max="150" value="10" />
         </div>
+
         <div>
-          <label>Timer (minutes)</label>
+          <label for="minutes">Timer (minutes)</label>
           <input id="minutes" type="number" min="1" max="180" value="20" />
         </div>
       </div>
@@ -52,6 +54,7 @@
             <button id="clearAllBtn" type="button" class="mini-btn">Clear All</button>
           </div>
         </div>
+
         <input id="topicSearch" type="text" placeholder="Search topics..." />
         <div id="topicsWrap" class="topics-wrap"></div>
       </div>
@@ -91,11 +94,13 @@
             <h2>Review</h2>
             <p id="reviewScore" class="muted"></p>
           </div>
+
           <div class="small-row">
             <button id="retryWrongBtn" class="mini-btn" type="button">Retry Wrong</button>
             <button id="backSetupBtn" class="mini-btn" type="button">Back to Setup</button>
           </div>
         </div>
+
         <div id="reviewList" class="review-list"></div>
       </div>
     </section>
