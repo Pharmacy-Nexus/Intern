@@ -12,7 +12,7 @@ function adminHeaders() {
 }
 
 function message(text, ok = true) {
-  el("adminMessage").innerHTML = `<p class="muted" style="color:${ok ? "#1c9d61" : "#d84d4d"};">${text}</p>`;
+  el("adminMessage").innerHTML = `<div class="message-box ${ok ? "" : "error"}">${escapeHtml(text)}</div>`;
 }
 
 function normalizeQuestion(q) {
