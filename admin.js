@@ -2,6 +2,8 @@ const API_BASE = "http://localhost:3000";
 
 const el = (id) => document.getElementById(id);
 
+let loadedQuestions = [];
+
 function adminHeaders() {
   return {
     "Content-Type": "application/json",
@@ -10,7 +12,30 @@ function adminHeaders() {
 }
 
 function message(text, ok = true) {
-  el("adminMessage").innerHTML = `<p class="muted" style="color:${ok ? "#1c9d61" : "#d84d4d"};">${text}</p>`;
+  el("adminMessage").innerHTML = `<div class="message-box ${ok ? "" : "error"}">${escapeHtml(text)}</div>`;
+}
+
+function normalizeQuestion(q) {
+  return {
+    id: q.id || "",
+    topic: q.topic || "",
+    difficulty: q.difficulty || "medium",
+    caseScenario: q.caseScenario ?? q.case_scenario ?? "",
+    question: q.question || "",
+    options: Array.isArray(q.options) ? q.options : [],
+    correctAnswer: q.correctAnswer ?? q.correct_answer ?? "",
+    explanation: q.explanation || "",
+    summary: q.summary || ""
+  };
+}
+
+function escapeHtml(str) {
+  return String(str ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
 function clearForm() {
@@ -47,6 +72,29 @@ function formData() {
   };
 }
 
+function renderQuestionList() {
+  const list = el("questionList");
+  list.innerHTML = "";
+
+  loadedQuestions.forEach((question, index) => {
+    const q = normalizeQuestion(question);
+    const card = document.createElement("div");
+    card.className = "review-card";
+
+    card.innerHTML = `
+      <h3>${escapeHtml(q.question)}</h3>
+      <p><strong>Topic:</strong> ${escapeHtml(q.topic)}</p>
+      <p><strong>Difficulty:</strong> ${escapeHtml(q.difficulty)}</p>
+      <div class="small-row">
+        <button class="mini-btn" type="button" data-action="edit" data-index="${index}">Edit</button>
+        <button class="mini-btn" type="button" data-action="delete" data-id="${escapeHtml(q.id)}">Delete</button>
+      </div>
+    `;
+
+    list.appendChild(card);
+  });
+}
+
 async function loadQuestions() {
   try {
     const topic = el("filterTopic").value.trim();
@@ -61,35 +109,28 @@ async function loadQuestions() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Failed to load");
 
-    el("questionList").innerHTML = data.questions.map(q => `
-      <div class="review-card">
-        <h3>${q.question}</h3>
-        <p><strong>Topic:</strong> ${q.topic}</p>
-        <p><strong>Difficulty:</strong> ${q.difficulty}</p>
-        <div class="small-row">
-          <button class="mini-btn" onclick='editQuestion(${JSON.stringify(q).replace(/'/g, "&apos;")})'>Edit</button>
-          <button class="mini-btn" onclick="deleteQuestion('${q.id}')">Delete</button>
-        </div>
-      </div>
-    `).join("");
+    loadedQuestions = Array.isArray(data.questions) ? data.questions : [];
+    renderQuestionList();
   } catch (e) {
     message(e.message, false);
   }
 }
 
 window.editQuestion = function (q) {
-  el("questionId").value = q.id || "";
-  el("topic").value = q.topic || "";
-  el("difficulty").value = q.difficulty || "medium";
-  el("caseScenario").value = q.caseScenario || "";
-  el("question").value = q.question || "";
-  el("opt1").value = q.options?.[0] || "";
-  el("opt2").value = q.options?.[1] || "";
-  el("opt3").value = q.options?.[2] || "";
-  el("opt4").value = q.options?.[3] || "";
-  el("correctAnswer").value = q.correctAnswer || "";
-  el("explanation").value = q.explanation || "";
-  el("summary").value = q.summary || "";
+  const normalized = normalizeQuestion(q);
+
+  el("questionId").value = normalized.id;
+  el("topic").value = normalized.topic;
+  el("difficulty").value = normalized.difficulty;
+  el("caseScenario").value = normalized.caseScenario;
+  el("question").value = normalized.question;
+  el("opt1").value = normalized.options?.[0] || "";
+  el("opt2").value = normalized.options?.[1] || "";
+  el("opt3").value = normalized.options?.[2] || "";
+  el("opt4").value = normalized.options?.[3] || "";
+  el("correctAnswer").value = normalized.correctAnswer;
+  el("explanation").value = normalized.explanation;
+  el("summary").value = normalized.summary;
   window.scrollTo({ top: 0, behavior: "smooth" });
 };
 
@@ -139,6 +180,24 @@ async function saveQuestion() {
     message(e.message, false);
   }
 }
+
+el("questionList").addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return;
+
+  const action = target.dataset.action;
+
+  if (action === "edit") {
+    const index = Number(target.dataset.index);
+    const q = loadedQuestions[index];
+    if (q) window.editQuestion(q);
+  }
+
+  if (action === "delete") {
+    const id = target.dataset.id;
+    if (id) window.deleteQuestion(id);
+  }
+});
 
 el("saveBtn").addEventListener("click", saveQuestion);
 el("clearBtn").addEventListener("click", clearForm);

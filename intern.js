@@ -9,7 +9,7 @@ const state = {
   topics: [],
   questions: [],
   current: 0,
-  mode: "practice",
+  mode: 'practice',
   answers: {},
   bookmarks: {},
   timerId: null,
@@ -20,12 +20,12 @@ const state = {
 const el = (id) => document.getElementById(id);
 
 function escapeHtml(str) {
-  return String(str ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+  return String(str ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
 }
 
 function shuffle(arr) {
@@ -37,6 +37,29 @@ function shuffle(arr) {
   return a;
 }
 
+function setSetupMessage(text, isError = false) {
+  const message = el('setupMessage');
+  if (!message) return;
+
+  if (!text) {
+    message.innerHTML = '';
+    return;
+  }
+
+  message.innerHTML = `<div class="message-box ${isError ? 'error' : ''}">${escapeHtml(text)}</div>`;
+}
+
+function updateTopicBadges() {
+  const total = state.topics.length;
+  const selected = getSelectedTopics().length;
+
+  const totalBadge = el('totalTopicsBadge');
+  const selectedBadge = el('selectedTopicsBadge');
+
+  if (totalBadge) totalBadge.textContent = String(total);
+  if (selectedBadge) selectedBadge.textContent = String(selected);
+}
+
 async function fetchTopics() {
   const { data, error } = await supabase
     .from('intern_questions')
@@ -44,63 +67,58 @@ async function fetchTopics() {
     .eq('is_active', true);
 
   if (error) {
-    console.error("fetchTopics error:", error);
-    throw new Error("Failed to load topics.");
+    console.error('fetchTopics error:', error);
+    throw new Error('Failed to load topics.');
   }
 
   return [...new Set((data || []).map(item => String(item.topic).trim().toLowerCase()))];
 }
 
 async function fetchExam(payload) {
-  const { topics = [], count = 10, difficulty = "all" } = payload;
+  const { topics = [], count = 10, difficulty = 'all' } = payload;
 
   let query = supabase
     .from('intern_questions')
     .select('*')
     .eq('is_active', true);
 
-  if (topics.length) {
-    query = query.in('topic', topics);
-  }
-
-  if (difficulty !== 'all') {
-    query = query.eq('difficulty', difficulty);
-  }
+  if (topics.length) query = query.in('topic', topics);
+  if (difficulty !== 'all') query = query.eq('difficulty', difficulty);
 
   const { data, error } = await query;
 
   if (error) {
-    console.error("fetchExam error:", error);
-    throw new Error("Failed to load questions.");
+    console.error('fetchExam error:', error);
+    throw new Error('Failed to load questions.');
   }
 
   if (!data || !data.length) {
-    throw new Error("No matching questions found.");
+    throw new Error('No matching questions found.');
   }
 
   return shuffle(data)
     .slice(0, count)
-    .map(q => ({
+    .map((q) => ({
       id: q.id,
       topic: q.topic,
       difficulty: q.difficulty,
       type: q.type,
-      caseScenario: q.case_scenario || "",
+      caseScenario: q.case_scenario || '',
       question: q.question,
       options: shuffle(q.options || []),
       correctAnswer: q.correct_answer,
-      explanation: q.explanation || "",
-      summary: q.summary || ""
+      explanation: q.explanation || '',
+      summary: q.summary || ''
     }));
 }
 
 function renderTopics(list) {
-  const wrap = el("topicsWrap");
-  wrap.innerHTML = "";
+  const wrap = el('topicsWrap');
+  wrap.innerHTML = '';
 
-  list.forEach(topic => {
-    const item = document.createElement("div");
-    item.className = "topic-item";
+  list.forEach((topic) => {
+    const item = document.createElement('div');
+    item.className = 'topic-item';
     item.innerHTML = `
       <label>
         <input type="checkbox" value="${escapeHtml(topic)}" checked />
@@ -109,48 +127,51 @@ function renderTopics(list) {
     `;
     wrap.appendChild(item);
   });
+
+  updateTopicBadges();
 }
 
 function getSelectedTopics() {
   return [...document.querySelectorAll('#topicsWrap input[type="checkbox"]:checked')]
-    .map(i => i.value.trim().toLowerCase());
+    .map((i) => i.value.trim().toLowerCase());
 }
 
 function filterTopicsUI(term) {
   const q = term.trim().toLowerCase();
-  [...document.querySelectorAll(".topic-item")].forEach(item => {
+  [...document.querySelectorAll('.topic-item')].forEach((item) => {
     const text = item.innerText.trim().toLowerCase();
-    item.style.display = text.includes(q) ? "" : "none";
+    item.style.display = text.includes(q) ? '' : 'none';
   });
 }
 
 function setAllTopics(checked) {
-  document.querySelectorAll('#topicsWrap input[type="checkbox"]').forEach(i => {
+  document.querySelectorAll('#topicsWrap input[type="checkbox"]').forEach((i) => {
     i.checked = checked;
   });
+  updateTopicBadges();
 }
 
 function updateProgress() {
   const total = state.questions.length || 1;
   const current = Math.min(state.current + 1, total);
-  el("progressFill").style.width = `${(current / total) * 100}%`;
-  el("progressText").textContent = `Question ${current} / ${total}`;
+  el('progressFill').style.width = `${(current / total) * 100}%`;
+  el('progressText').textContent = `Question ${current} / ${total}`;
 }
 
 function formatTime(seconds) {
-  const m = String(Math.floor(seconds / 60)).padStart(2, "0");
-  const s = String(seconds % 60).padStart(2, "0");
+  const m = String(Math.floor(seconds / 60)).padStart(2, '0');
+  const s = String(seconds % 60).padStart(2, '0');
   return `${m}:${s}`;
 }
 
 function startTimer(minutes) {
   stopTimer();
   state.remainingSeconds = minutes * 60;
-  el("timerText").textContent = formatTime(state.remainingSeconds);
+  el('timerText').textContent = formatTime(state.remainingSeconds);
 
   state.timerId = setInterval(() => {
     state.remainingSeconds -= 1;
-    el("timerText").textContent = formatTime(Math.max(0, state.remainingSeconds));
+    el('timerText').textContent = formatTime(Math.max(0, state.remainingSeconds));
 
     if (state.remainingSeconds <= 0) {
       stopTimer();
@@ -173,19 +194,19 @@ function renderQuestion() {
   updateProgress();
 
   const selected = state.answers[q.id];
-  const isPractice = state.mode === "practice";
+  const isPractice = state.mode === 'practice';
   const bookmarked = !!state.bookmarks[q.id];
 
-  el("questionArea").innerHTML = `
+  el('questionArea').innerHTML = `
     <div class="question-top">
       <div>
-        <div class="pill">${escapeHtml(state.mode === "practice" ? "Practice Mode" : "Real Exam Mode")}</div>
+        <div class="pill">${escapeHtml(state.mode === 'practice' ? 'Practice Mode' : 'Real Exam Mode')}</div>
         <h2>${state.current + 1}) ${escapeHtml(q.question)}</h2>
         <p class="muted">${escapeHtml(q.topic)} • ${escapeHtml(q.difficulty)}</p>
       </div>
 
-      <button id="bookmarkBtn" class="bookmark-btn ${bookmarked ? "active" : ""}" type="button">
-        ${bookmarked ? "★ Bookmarked" : "☆ Bookmark"}
+      <button id="bookmarkBtn" class="bookmark-btn ${bookmarked ? 'active' : ''}" type="button">
+        ${bookmarked ? '★ Bookmarked' : '☆ Bookmark'}
       </button>
     </div>
 
@@ -194,28 +215,28 @@ function renderQuestion() {
         <strong>Case</strong>
         <div style="margin-top:8px;">${escapeHtml(q.caseScenario)}</div>
       </div>
-    ` : ""}
+    ` : ''}
 
     <div id="optionList" class="option-list"></div>
     <div id="practiceExtras"></div>
 
     <div class="action-row" style="margin-top:18px;">
-      <button id="prevBtn" class="mini-btn" type="button" ${state.current === 0 ? "disabled" : ""}>Previous</button>
-      <button id="nextBtn" class="primary-btn" type="button">${state.current === state.questions.length - 1 ? "Finish" : "Next"}</button>
+      <button id="prevBtn" class="mini-btn" type="button" ${state.current === 0 ? 'disabled' : ''}>Previous</button>
+      <button id="nextBtn" class="primary-btn" type="button">${state.current === state.questions.length - 1 ? 'Finish' : 'Next'}</button>
     </div>
   `;
 
-  const optionList = el("optionList");
+  const optionList = el('optionList');
 
-  q.options.forEach(opt => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "option-btn";
+  q.options.forEach((opt) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'option-btn';
     btn.textContent = opt;
 
-    if (selected === opt) btn.classList.add("selected");
+    if (selected === opt) btn.classList.add('selected');
 
-    btn.addEventListener("click", () => {
+    btn.addEventListener('click', () => {
       state.answers[q.id] = opt;
       if (isPractice) {
         showPracticeAnswer(q);
@@ -227,19 +248,19 @@ function renderQuestion() {
     optionList.appendChild(btn);
   });
 
-  el("bookmarkBtn").addEventListener("click", () => {
+  el('bookmarkBtn').addEventListener('click', () => {
     state.bookmarks[q.id] = !state.bookmarks[q.id];
     renderQuestion();
   });
 
-  el("prevBtn").addEventListener("click", () => {
+  el('prevBtn').addEventListener('click', () => {
     if (state.current > 0) {
       state.current -= 1;
       renderQuestion();
     }
   });
 
-  el("nextBtn").addEventListener("click", () => {
+  el('nextBtn').addEventListener('click', () => {
     if (state.current < state.questions.length - 1) {
       state.current += 1;
       renderQuestion();
@@ -248,38 +269,36 @@ function renderQuestion() {
     }
   });
 
-  if (isPractice && selected) {
-    showPracticeAnswer(q);
-  }
+  if (isPractice && selected) showPracticeAnswer(q);
 }
 
 function showPracticeAnswer(q) {
   const selected = state.answers[q.id];
   const correct = q.correctAnswer;
-  const optionButtons = [...document.querySelectorAll(".option-btn")];
+  const optionButtons = [...document.querySelectorAll('.option-btn')];
 
-  optionButtons.forEach(btn => {
-    btn.classList.remove("correct", "wrong");
-    if (btn.textContent === correct) btn.classList.add("correct");
-    if (btn.textContent === selected && selected !== correct) btn.classList.add("wrong");
+  optionButtons.forEach((btn) => {
+    btn.classList.remove('correct', 'wrong');
+    if (btn.textContent === correct) btn.classList.add('correct');
+    if (btn.textContent === selected && selected !== correct) btn.classList.add('wrong');
   });
 
-  el("practiceExtras").innerHTML = `
+  el('practiceExtras').innerHTML = `
     <div class="answer-box">
       <strong>Correct Answer:</strong> ${escapeHtml(correct)}
-      <div style="margin-top:8px;">${escapeHtml(q.explanation || "No explanation available.")}</div>
+      <div style="margin-top:8px;">${escapeHtml(q.explanation || 'No explanation available.')}</div>
     </div>
 
     <div class="summary-box">
       <strong>Quick Summary</strong>
-      <div style="margin-top:8px;">${escapeHtml(q.summary || "No summary available.")}</div>
+      <div style="margin-top:8px;">${escapeHtml(q.summary || 'No summary available.')}</div>
     </div>
   `;
 }
 
 function buildReviewRows() {
-  state.reviewRows = state.questions.map(q => {
-    const selected = state.answers[q.id] || "No answer selected";
+  state.reviewRows = state.questions.map((q) => {
+    const selected = state.answers[q.id] || 'No answer selected';
     const correct = q.correctAnswer;
 
     return {
@@ -298,41 +317,41 @@ function submitExam() {
 }
 
 function renderReview() {
-  const correct = state.reviewRows.filter(r => r.isCorrect).length;
+  const correct = state.reviewRows.filter((r) => r.isCorrect).length;
   const total = state.reviewRows.length;
 
-  el("examShell").classList.add("hidden");
-  el("reviewShell").classList.remove("hidden");
-  el("reviewScore").textContent = `Score: ${correct} / ${total}`;
+  el('examShell').classList.add('hidden');
+  el('reviewShell').classList.remove('hidden');
+  el('reviewScore').textContent = `Score: ${correct} / ${total}`;
 
-  el("reviewList").innerHTML = state.reviewRows.map((row, i) => `
+  el('reviewList').innerHTML = state.reviewRows.map((row, i) => `
     <div class="review-card">
       <h3>${i + 1}) ${escapeHtml(row.question.question)}</h3>
-      ${row.question.caseScenario ? `<div class="case-box">${escapeHtml(row.question.caseScenario)}</div>` : ""}
+      ${row.question.caseScenario ? `<div class="case-box">${escapeHtml(row.question.caseScenario)}</div>` : ''}
       <p><strong>Your Answer:</strong> ${escapeHtml(row.selected)}</p>
       <p><strong>Correct Answer:</strong> ${escapeHtml(row.correct)}</p>
-      <p class="${row.isCorrect ? "status-correct" : "status-wrong"}">
-        ${row.isCorrect ? "Correct" : "Wrong"}
+      <p class="${row.isCorrect ? 'status-correct' : 'status-wrong'}">
+        ${row.isCorrect ? 'Correct' : 'Wrong'}
       </p>
 
       <div class="answer-box">
         <strong>Explanation</strong>
-        <div style="margin-top:8px;">${escapeHtml(row.question.explanation || "No explanation available.")}</div>
+        <div style="margin-top:8px;">${escapeHtml(row.question.explanation || 'No explanation available.')}</div>
       </div>
 
       <div class="summary-box">
         <strong>Quick Summary</strong>
-        <div style="margin-top:8px;">${escapeHtml(row.question.summary || "No summary available.")}</div>
+        <div style="margin-top:8px;">${escapeHtml(row.question.summary || 'No summary available.')}</div>
       </div>
     </div>
-  `).join("");
+  `).join('');
 }
 
 function retryWrong() {
-  const wrong = state.reviewRows.filter(r => !r.isCorrect).map(r => r.question);
+  const wrong = state.reviewRows.filter((r) => !r.isCorrect).map((r) => r.question);
 
   if (!wrong.length) {
-    alert("No wrong questions to retry.");
+    alert('No wrong questions to retry.');
     return;
   }
 
@@ -341,12 +360,12 @@ function retryWrong() {
   state.answers = {};
   state.reviewRows = [];
 
-  el("reviewShell").classList.add("hidden");
-  el("examShell").classList.remove("hidden");
-  el("modeBadge").textContent = "Retry Wrong";
+  el('reviewShell').classList.add('hidden');
+  el('examShell').classList.remove('hidden');
+  el('modeBadge').textContent = 'Retry Wrong';
 
-  if (state.mode === "exam") {
-    startTimer(Number(el("minutes").value || 20));
+  if (state.mode === 'exam') {
+    startTimer(Number(el('minutes').value || 20));
   }
 
   renderQuestion();
@@ -355,16 +374,17 @@ function retryWrong() {
 async function startExam() {
   try {
     const topics = getSelectedTopics();
-    const count = Number(el("count").value || 10);
-    const difficulty = el("difficulty").value;
-    const minutes = Number(el("minutes").value || 20);
-    const mode = el("mode").value;
+    const count = Number(el('count').value || 10);
+    const difficulty = el('difficulty').value;
+    const minutes = Number(el('minutes').value || 20);
+    const mode = el('mode').value;
 
     if (!topics.length) {
-      el("setupMessage").innerHTML = `<p class="muted">Select at least one topic.</p>`;
+      setSetupMessage('Select at least one topic.', true);
       return;
     }
 
+    setSetupMessage('');
     const exam = await fetchExam({ topics, count, difficulty });
 
     state.questions = exam;
@@ -374,30 +394,30 @@ async function startExam() {
     state.bookmarks = {};
     state.reviewRows = [];
 
-    el("setupCard").classList.add("hidden");
-    el("reviewShell").classList.add("hidden");
-    el("examShell").classList.remove("hidden");
-    el("modeBadge").textContent = mode === "practice" ? "Practice Mode" : "Real Exam Mode";
+    el('setupCard').classList.add('hidden');
+    el('reviewShell').classList.add('hidden');
+    el('examShell').classList.remove('hidden');
+    el('modeBadge').textContent = mode === 'practice' ? 'Practice Mode' : 'Real Exam Mode';
 
-    if (mode === "exam") {
+    if (mode === 'exam') {
       startTimer(minutes);
     } else {
       stopTimer();
-      el("timerText").textContent = "--:--";
+      el('timerText').textContent = '--:--';
     }
 
     renderQuestion();
   } catch (e) {
     console.error(e);
-    el("setupMessage").innerHTML = `<p class="muted">${escapeHtml(e.message)}</p>`;
+    setSetupMessage(e.message, true);
   }
 }
 
 function backToSetup() {
   stopTimer();
-  el("setupCard").classList.remove("hidden");
-  el("examShell").classList.add("hidden");
-  el("reviewShell").classList.add("hidden");
+  el('setupCard').classList.remove('hidden');
+  el('examShell').classList.add('hidden');
+  el('reviewShell').classList.add('hidden');
 }
 
 async function init() {
@@ -405,19 +425,26 @@ async function init() {
     state.topics = await fetchTopics();
     renderTopics(state.topics);
 
-    el("topicSearch").addEventListener("input", (e) => {
+    el('topicSearch').addEventListener('input', (e) => {
       filterTopicsUI(e.target.value);
     });
 
-    el("selectAllBtn").addEventListener("click", () => setAllTopics(true));
-    el("clearAllBtn").addEventListener("click", () => setAllTopics(false));
-    el("startBtn").addEventListener("click", startExam);
-    el("retryWrongBtn").addEventListener("click", retryWrong);
-    el("backSetupBtn").addEventListener("click", backToSetup);
-    el("submitBtn").addEventListener("click", submitExam);
+    el('topicsWrap').addEventListener('change', (event) => {
+      const target = event.target;
+      if (target instanceof HTMLInputElement && target.type === 'checkbox') {
+        updateTopicBadges();
+      }
+    });
+
+    el('selectAllBtn').addEventListener('click', () => setAllTopics(true));
+    el('clearAllBtn').addEventListener('click', () => setAllTopics(false));
+    el('startBtn').addEventListener('click', startExam);
+    el('retryWrongBtn').addEventListener('click', retryWrong);
+    el('backSetupBtn').addEventListener('click', backToSetup);
+    el('submitBtn').addEventListener('click', submitExam);
   } catch (e) {
     console.error(e);
-    el("setupMessage").innerHTML = `<p class="muted">${escapeHtml(e.message)}</p>`;
+    setSetupMessage(e.message, true);
   }
 }
 
