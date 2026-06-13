@@ -3,9 +3,43 @@ const formEl = document.getElementById("chatForm");
 const inputEl = document.getElementById("messageInput");
 const newChatBtn = document.getElementById("newChatBtn");
 const exportPdfBtn = document.getElementById("exportPdfBtn");
+const themeToggle = document.getElementById("themeToggle");
 
 let conversation = [];
 
+/* ── Theme Management ────────────────────────── */
+function initTheme() {
+  const savedTheme = localStorage.getItem("nexus-theme");
+  if (savedTheme) {
+    document.documentElement.setAttribute("data-theme", savedTheme);
+    updateThemeUI(savedTheme);
+  }
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute("data-theme");
+  const next = current === "light" ? "dark" : "light";
+  document.documentElement.setAttribute("data-theme", next);
+  localStorage.setItem("nexus-theme", next);
+  updateThemeUI(next);
+}
+
+function updateThemeUI(theme) {
+  const icon = themeToggle.querySelector(".theme-icon");
+  const label = themeToggle.querySelector(".theme-label");
+  if (theme === "light") {
+    icon.textContent = "☀️";
+    label.textContent = "Light Mode";
+  } else {
+    icon.textContent = "🌙";
+    label.textContent = "Dark Mode";
+  }
+}
+
+initTheme();
+themeToggle.addEventListener("click", toggleTheme);
+
+/* ── Utilities ───────────────────────────────── */
 function escapeHtml(text = "") {
   return text
     .replace(/&/g, "&amp;")
@@ -135,6 +169,7 @@ function resetChat() {
 
 newChatBtn.addEventListener("click", resetChat);
 
+/* ── Chat Submission ─────────────────────────── */
 formEl.addEventListener("submit", async (e) => {
   e.preventDefault();
 
@@ -191,6 +226,7 @@ formEl.addEventListener("submit", async (e) => {
   messagesEl.scrollTop = messagesEl.scrollHeight;
 });
 
+/* ── PDF Export ──────────────────────────────── */
 exportPdfBtn.addEventListener("click", () => {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
@@ -221,4 +257,19 @@ exportPdfBtn.addEventListener("click", () => {
   doc.save("nexus-chat.pdf");
 });
 
+/* ── Keyboard Shortcuts ──────────────────────── */
+document.addEventListener("keydown", (e) => {
+  // Ctrl/Cmd + Enter to send
+  if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && document.activeElement === inputEl) {
+    formEl.dispatchEvent(new Event("submit"));
+  }
+  // Escape to clear input
+  if (e.key === "Escape" && document.activeElement === inputEl) {
+    inputEl.value = "";
+    autoGrow(inputEl);
+    inputEl.blur();
+  }
+});
+
+/* ── Init ────────────────────────────────────── */
 resetChat();
