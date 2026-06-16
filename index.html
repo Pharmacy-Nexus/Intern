@@ -1,65 +1,38 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" dir="ltr">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Nexus Clinical Pharmacist AI</title>
   <link rel="stylesheet" href="style.css" />
-<base target="_blank">
 </head>
 <body>
   <div class="app">
     <aside class="sidebar">
-      <div class="brand">
-        <div class="brand-icon">✚</div>
-        <div>
-          <h1>Nexus</h1>
-          <p>Clinical Pharmacist AI</p>
-        </div>
-      </div>
-
-      <button id="newChatBtn" class="new-chat-btn">+ New Chat</button>
-
-      <div class="sidebar-box">
-        <h3>Auto Mode</h3>
-        <p>
-          The assistant automatically detects:
-          Drug Info, Drug Safety, Case Analysis, Report, or General Chat.
-        </p>
-      </div>
-
-      <div class="sidebar-footer">
-        <button id="themeToggle" class="theme-toggle" title="Toggle Theme">
-          <span class="theme-icon">🌙</span>
-          <span class="theme-label">Dark Mode</span>
-        </button>
-        <p>Decision support only. Always verify with current guidelines and patient-specific factors.</p>
-      </div>
+      <div class="brand"><div class="brand-mark">Nx</div><div><h1>Nexus</h1><p>Clinical Pharmacist Workspace</p></div></div>
+      <button id="newChatBtn" class="new-chat-btn">New consultation</button>
+      <div class="sidebar-box"><h3>Workflow</h3><p>Auto-detects drug info, interaction checks, case analysis, comparison, reverse scenario, and report mode.</p></div>
+      <div class="sidebar-box compact"><h3>Quick commands</h3><p><strong>@compare</strong> دواء مقابل دواء</p><p><strong>@reverse</strong> سيناريو عكسي</p><p><strong>@case</strong> تحليل حالة</p><p><strong>@report</strong> تجهيز تقرير</p></div>
+      <div class="sidebar-footer"><button id="themeToggle" class="theme-toggle" title="Toggle theme"><span class="theme-label">Toggle theme</span></button><p>Clinical decision support for pharmacists. Verify before applying.</p></div>
     </aside>
-
     <main class="chat-area">
-      <header class="chat-header">
-        <div>
-          <h2>Nexus Clinical Pharmacist AI</h2>
-          <p>Chat + Auto mode detection + PDF export</p>
-        </div>
-        <button id="exportPdfBtn" class="export-btn">Export PDF</button>
-      </header>
-
+      <header class="chat-header"><div><h2>Nexus Clinical Pharmacist AI</h2><p>Clinical chat with validation, workflow routing, and editable PDF report.</p></div><button id="exportPdfBtn" class="export-btn">Report PDF</button></header>
       <section id="messages" class="messages"></section>
-
-      <form id="chatForm" class="composer">
-        <textarea
-          id="messageInput"
-          rows="1"
-          placeholder="Describe the patient case, ask about a drug, or request a report..."
-        ></textarea>
-        <button type="submit" id="sendBtn">Send</button>
+      <form id="chatForm" class="composer" autocomplete="off">
+        <div class="input-shell"><textarea id="messageInput" rows="1" placeholder="اكتب الحالة أو اسأل عن دواء... استخدم @ للأوامر"></textarea>
+          <div id="commandMenu" class="command-menu hidden">
+            <button type="button" data-template="/قارن ">@compare <span>مقارنة بين دوائين</span></button>
+            <button type="button" data-template="/عكس ">@reverse <span>سيناريو عكسي لدواء</span></button>
+            <button type="button" data-template="حلل الحالة: ">@case <span>تحليل حالة ناقصة أو كاملة</span></button>
+            <button type="button" data-template="اعمل تقرير PDF للحالة: ">@report <span>تجهيز تقرير</span></button>
+            <button type="button" data-template="اشرح دواء: ">@drug <span>معلومة دوائية</span></button>
+            <button type="button" data-template="راجع الأمان الدوائي: ">@safety <span>تداخلات وجرعات</span></button>
+          </div>
+        </div>
+        <button type="submit" id="sendBtn" aria-label="Send"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.7 20.3 21 12 3.7 3.7 6 10.7 14 12l-8 1.3-2.3 7Z"></path></svg></button>
       </form>
     </main>
   </div>
-
-  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-  <script src="script.js"></script>
-</body>
-</html>
+  <div id="reportModal" class="modal hidden" role="dialog" aria-modal="true"><div class="modal-panel"><div class="modal-header"><div><h3>تقرير PDF قابل للتعديل</h3><p>عدّل، احذف، أو أضف ملاحظات قبل التصدير.</p></div><button id="closeReportModal" class="icon-btn" type="button">×</button></div><textarea id="reportEditor" class="report-editor"></textarea><div class="modal-actions"><button id="downloadPdfBtn" class="primary-btn" type="button">Download PDF</button><button id="copyReportBtn" class="secondary-btn" type="button">Copy</button><button id="cancelReportBtn" class="secondary-btn" type="button">Cancel</button></div></div></div>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script><script src="script.js"></script>
+</body></html>
