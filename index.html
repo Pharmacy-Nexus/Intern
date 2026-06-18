@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Nexus Clinical Pharmacist</title>
+  <title>Nexus AI Pharmacist</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -13,49 +13,59 @@
         <div class="logo-mark">Nx</div>
         <div>
           <div class="brand-title">Nexus</div>
-          <div class="brand-subtitle">Clinical Pharmacist Workspace</div>
+          <div class="brand-subtitle">AI Pharmacist Workspace</div>
         </div>
       </div>
 
-      <button id="newChatBtn" class="primary-btn">New consultation</button>
+      <button id="newChatBtn" class="primary-btn">New chat</button>
+      <input id="chatSearch" class="chat-search" placeholder="Search chats..." />
+
+      <div class="side-section-title">Pinned</div>
+      <div id="pinnedChats" class="chat-list"></div>
+
+      <div class="side-section-title">Chats</div>
+      <div id="chatList" class="chat-list"></div>
 
       <div class="side-card">
-        <div class="side-title">Workspace modes</div>
+        <div class="side-title">Modes</div>
         <button class="side-command" data-command="@case ">@case <span>تحليل حالة</span></button>
         <button class="side-command" data-command="@compare ">@compare <span>مقارنة دوائين</span></button>
         <button class="side-command" data-command="@reverse ">@reverse <span>عكس السيناريو</span></button>
         <button class="side-command" data-command="@report ">@report <span>تجهيز تقرير</span></button>
       </div>
 
-      <div class="side-note">
-        Built for pharmacist reasoning: mode routing, silent validation, and editable reports.
-      </div>
+      <div class="side-note">Saved chats are stored locally in this browser.</div>
     </aside>
 
     <main class="main">
       <header class="topbar">
         <div>
-          <div class="page-title">Nexus Clinical Pharmacist</div>
-          <div class="page-subtitle">Ask naturally. I route the task automatically.</div>
+          <div class="page-title">Nexus AI Pharmacist</div>
+          <div class="page-subtitle">Ask naturally. Use @ for focused modes.</div>
         </div>
-        <button id="exportPdfBtn" class="secondary-btn">Report PDF</button>
+        <div class="top-actions">
+          <button id="pinChatBtn" class="secondary-btn">Pin</button>
+          <button id="renameChatBtn" class="secondary-btn">Rename</button>
+          <button id="deleteChatBtn" class="danger-btn">Delete</button>
+          <button id="exportPdfBtn" class="secondary-btn">Report PDF</button>
+        </div>
       </header>
 
       <section id="messages" class="messages"></section>
 
       <section class="composer-wrap">
         <div id="commandPalette" class="command-palette hidden">
-          <button data-command="@case "><b>@case</b><span>Analyze incomplete or full patient case</span></button>
+          <button data-command="@case "><b>@case</b><span>Analyze patient case</span></button>
           <button data-command="@compare "><b>@compare</b><span>Compare two medicines</span></button>
-          <button data-command="@reverse "><b>@reverse</b><span>Reverse scenario / interaction simulation</span></button>
-          <button data-command="@report "><b>@report</b><span>Prepare editable PDF report</span></button>
+          <button data-command="@reverse "><b>@reverse</b><span>Reverse scenario simulation</span></button>
+          <button data-command="@report "><b>@report</b><span>Prepare editable report</span></button>
         </div>
 
         <form id="chatForm" class="composer">
-          <textarea id="messageInput" rows="1" placeholder="Message Nexus… try @compare ramipril losartan"></textarea>
+          <textarea id="messageInput" rows="1" placeholder="Message Nexus... try @compare ramipril losartan"></textarea>
           <button id="sendBtn" type="submit" aria-label="Send message">↑</button>
         </form>
-        <div class="composer-hint">اكتب <b>@</b> لفتح أوامر المساعد · Ctrl/⌘ + Enter للإرسال</div>
+        <div class="composer-hint">اكتب <b>@</b> لفتح الأوامر · Ctrl/⌘ + Enter للإرسال</div>
       </section>
     </main>
   </div>
