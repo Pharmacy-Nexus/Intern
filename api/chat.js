@@ -2,6 +2,7 @@ const API_URL = process.env.NVIDIA_API_URL || "https://integrate.api.nvidia.com/
 const MODEL = process.env.NVIDIA_MODEL || "moonshotai/kimi-k2.6";
 
 const MODE_LABELS = {
+  general_chat: "General Chat",
   case_analysis: "Case Analysis",
   drug_interaction: "Drug Interaction",
   drug_reverse: "Drug Reverse Interactive Training"
@@ -32,7 +33,7 @@ function detectModeFromText(text = "") {
   if (/reverse|quiz|train|scenario|clue|guess|interactive|عكس|تدريب/.test(t)) return "drug_reverse";
   if (/interaction|interact|contraindication|combine|together|warfarin|amiodarone|safety|تداخل|تفاعل|مع بعض/.test(t)) return "drug_interaction";
   if (/patient|case|year-old|y\/o|male|female|serum|creatinine|egfr|potassium|sodium|bp|hr|labs|مريض|حالة|تحاليل/.test(t)) return "case_analysis";
-  return "case_analysis";
+  return "general_chat";
 }
 
 function getLatestUserText(messages = []) {
@@ -58,7 +59,7 @@ function attachmentContext(messages = []) {
 }
 
 function buildSystemPrompt(mode, modeInstruction = "") {
-  const label = MODE_LABELS[mode] || MODE_LABELS.case_analysis;
+  const label = MODE_LABELS[mode] || MODE_LABELS.general_chat;
   const base = `
 You are Nexus Clinical Pharmacist AI, a professional clinical pharmacy assistant.
 Active mode: ${label}.
@@ -76,6 +77,11 @@ Core rules:
 `;
 
   const modePrompts = {
+    general_chat: `
+For General Chat:
+Answer naturally without forcing a tool format.
+If the user asks a clinical or pharmacy question, keep it practical and safe, but only use headings when they help.
+`,
     case_analysis: `
 For Case Analysis:
 Use these headings when relevant:
