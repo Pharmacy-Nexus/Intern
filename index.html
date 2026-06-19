@@ -3,92 +3,190 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Nexus Rx</title>
+  <meta name="theme-color" content="#0f172a" />
+  <title>Nexus Clinical Pharmacist</title>
+
+  <!--
+    Put your public Supabase values here before deployment,
+    or define them before script.js from another injected config file.
+  -->
+  <script>
+    window.NEXUS_SUPABASE_URL = window.NEXUS_SUPABASE_URL || "";
+    window.NEXUS_SUPABASE_ANON_KEY = window.NEXUS_SUPABASE_ANON_KEY || "";
+    window.NEXUS_API_ENDPOINT = window.NEXUS_API_ENDPOINT || "/api/chat";
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
 </head>
-<body>
-  <div class="app">
-    <aside class="sidebar">
-      <div class="brand">
-        <div class="brand-icon">Nx</div>
+<body data-theme="light" data-mode="case_analysis">
+  <section id="authPage" class="auth-page">
+    <div class="auth-art">
+      <div class="auth-logo">Nx</div>
+      <div class="auth-copy">
+        <span class="eyebrow">Professional AI workspace</span>
+        <h1>Nexus Clinical Pharmacist</h1>
+        <p>Case analysis, interaction checking, and interactive reverse-training in one clean clinical chat workspace.</p>
+      </div>
+      <div class="auth-preview-card">
+        <div class="mini-toolbar"><span></span><span></span><span></span></div>
+        <div class="mini-mode active">Case Analysis</div>
+        <div class="mini-line wide"></div>
+        <div class="mini-line"></div>
+        <div class="mini-callout">Missing labs detected · Ask for K⁺, SCr, eGFR</div>
+      </div>
+    </div>
+
+    <div class="auth-panel">
+      <div class="mobile-brand">
+        <div class="auth-logo small">Nx</div>
+        <strong>Nexus</strong>
+      </div>
+      <div class="auth-tabs" role="tablist" aria-label="Authentication tabs">
+        <button id="loginTab" class="auth-tab active" type="button">Login</button>
+        <button id="signupTab" class="auth-tab" type="button">Sign up</button>
+      </div>
+
+      <form id="authForm" class="auth-form">
         <div>
-          <div class="brand-title">Nexus Rx</div>
-          <div class="brand-subtitle">Clinical AI Assistant</div>
+          <h2 id="authTitle">Welcome back</h2>
+          <p id="authSubtitle">Login to continue your clinical workspace.</p>
         </div>
-      </div>
 
-      <button id="newChatBtn" class="new-btn">New Consultation</button>
+        <label id="nameField" class="field hidden">
+          <span>Full name</span>
+          <input id="nameInput" type="text" autocomplete="name" placeholder="Ahmed Nabil" />
+        </label>
 
-      <div class="nav-label">Main</div>
-      <button class="nav-item active" id="newChatMirror">New Chat</button>
+        <label class="field">
+          <span>Email</span>
+          <input id="emailInput" type="email" autocomplete="email" placeholder="you@example.com" required />
+        </label>
 
-      <div class="nav-label">Recent History</div>
-      <div id="chatList" class="history-list"></div>
+        <label class="field">
+          <span>Password</span>
+          <input id="passwordInput" type="password" autocomplete="current-password" placeholder="••••••••" minlength="6" required />
+        </label>
 
-      <div class="nav-label">Tools</div>
-      <div class="tool-list">
-        <button class="tool-tab tool-general active" data-command="">General</button>
-        <button class="tool-tab tool-case" data-command="@case ">Case</button>
-        <button class="tool-tab tool-safety" data-command="@safety ">Safety</button>
-        <button class="tool-tab tool-compare" data-command="@compare ">Compare</button>
-        <button class="tool-tab tool-reverse" data-command="@reverse ">Reverse</button>
-        <button class="tool-tab tool-report" data-command="@report ">Report</button>
-      </div>
+        <button id="authSubmitBtn" class="btn btn-primary" type="submit">Login</button>
+        <p id="authMessage" class="auth-message" aria-live="polite"></p>
 
-      <div class="spacer"></div>
-
-      <button class="nav-item subtle" id="pinChatBtn">Pin Chat</button>
-      <button class="nav-item subtle" id="renameChatBtn">Rename</button>
-      <button class="nav-item subtle danger-text" id="deleteChatBtn">Delete</button>
-
-      <div class="profile">
-        <div class="profile-avatar">DR</div>
-        <div>
-          <div class="profile-name">Dr. Pharmacist</div>
-          <div class="profile-role">Lead Clinical RPh</div>
+        <div class="local-note">
+          Supabase not configured? The UI will run in local demo mode so you can still test the experience.
         </div>
+      </form>
+    </div>
+  </section>
+
+  <div id="appRoot" class="app-shell hidden">
+    <div id="sidebarBackdrop" class="sidebar-backdrop"></div>
+
+    <aside id="sidebar" class="sidebar" aria-label="Application sidebar">
+      <div class="sidebar-top">
+        <div class="brand-row">
+          <div class="logo-mark">Nx</div>
+          <div class="brand-text">
+            <div class="brand-title">Nexus</div>
+            <div class="brand-subtitle">Clinical Pharmacist</div>
+          </div>
+        </div>
+        <button id="closeSidebarBtn" class="icon-btn mobile-only" type="button" aria-label="Close sidebar">×</button>
       </div>
+
+      <button id="newChatBtn" class="btn btn-new" type="button">
+        <span>＋</span>
+        New chat
+      </button>
+
+      <section class="side-section modes-section" aria-labelledby="modesTitle">
+        <div id="modesTitle" class="side-title">Modes / Tools</div>
+        <button class="mode-btn active" type="button" data-mode="case_analysis">
+          <span class="mode-icon">✦</span>
+          <span>
+            <strong>Case Analysis</strong>
+            <small>Clinical case reasoning</small>
+          </span>
+        </button>
+        <button class="mode-btn" type="button" data-mode="drug_interaction">
+          <span class="mode-icon">⚕</span>
+          <span>
+            <strong>Drug Interaction</strong>
+            <small>Safety & interaction check</small>
+          </span>
+        </button>
+        <button class="mode-btn" type="button" data-mode="drug_reverse">
+          <span class="mode-icon">↻</span>
+          <span>
+            <strong>Drug Reverse</strong>
+            <small>Interactive training mode</small>
+          </span>
+        </button>
+      </section>
+
+      <section class="side-section history-section" aria-labelledby="historyTitle">
+        <div class="history-head">
+          <div id="historyTitle" class="side-title">Chat history</div>
+          <button id="toggleArchiveBtn" class="tiny-btn" type="button">Archive</button>
+        </div>
+        <div id="chatHistory" class="chat-history" role="list"></div>
+      </section>
+
+      <footer class="sidebar-footer">
+        <button id="themeToggleBtn" class="footer-btn" type="button">
+          <span id="themeIcon">☾</span>
+          <span>Dark mode</span>
+        </button>
+        <div class="user-card">
+          <div id="userAvatar" class="user-avatar">A</div>
+          <div class="user-meta">
+            <strong id="userName">User</strong>
+            <small id="userEmail">user@example.com</small>
+          </div>
+          <button id="logoutBtn" class="icon-btn" type="button" aria-label="Logout">⎋</button>
+        </div>
+      </footer>
     </aside>
 
-    <main class="chat-area">
+    <main class="main">
       <header class="topbar">
-        <div>
-          <div class="page-title">Nexus Rx Chat Interface</div>
-          <div class="page-subtitle">Clinical answers. Clean notes. No noise.</div>
+        <button id="openSidebarBtn" class="icon-btn mobile-only" type="button" aria-label="Open sidebar">☰</button>
+        <div class="topbar-title">
+          <div class="active-mode-pill" id="activeModePill">Case Analysis</div>
+          <h1 id="conversationTitle">New clinical chat</h1>
         </div>
-        <button id="exportPdfBtn" class="outline-btn">Report PDF</button>
+        <div class="topbar-actions">
+          <button id="exportTopBtn" class="btn btn-soft" type="button">Export PDF</button>
+          <button id="shareTopBtn" class="btn btn-soft" type="button">Share</button>
+        </div>
       </header>
 
-      <section id="messages" class="messages"></section>
+      <section id="messages" class="messages" aria-live="polite"></section>
 
-      <section class="composer-zone">
+      <section class="composer-wrap">
+        <div id="attachedFiles" class="attached-files hidden"></div>
+
         <form id="chatForm" class="composer">
-          <textarea id="messageInput" rows="1" placeholder="Ask about a drug, interaction, protocol, or patient case..."></textarea>
-          <button id="sendBtn" type="submit" aria-label="Send">➤</button>
+          <button id="attachBtn" class="composer-icon" type="button" aria-label="Attach files">＋</button>
+          <input id="fileInput" class="hidden" type="file" multiple accept=".pdf,image/*,.txt,.md,.csv,.json" />
+          <textarea id="messageInput" rows="1" placeholder="Message Nexus…" autocomplete="off"></textarea>
+          <button id="sendBtn" class="send-btn" type="submit" aria-label="Send message">↑</button>
         </form>
-        <div class="footer-note">Nexus Rx can make mistakes. Verify clinical information with primary sources.</div>
+
+        <div class="composer-footer">
+          <span>Enter to send · Shift + Enter for new line</span>
+          <button id="stopBtn" class="stop-btn hidden" type="button">Stop generating</button>
+        </div>
       </section>
     </main>
   </div>
 
-  <div id="pdfModal" class="modal hidden">
-    <div class="modal-backdrop"></div>
-    <div class="modal-card">
-      <div class="modal-header">
-        <div>
-          <div class="modal-title">Editable Report Preview</div>
-          <div class="modal-subtitle">Edit before exporting</div>
-        </div>
-        <button id="closePdfModal" class="outline-btn">Close</button>
-      </div>
-      <textarea id="pdfEditor" class="pdf-editor"></textarea>
-      <div class="modal-actions">
-        <button id="downloadPdfBtn" class="new-btn">Download PDF</button>
-      </div>
-    </div>
-  </div>
+  <div id="toast" class="toast hidden"></div>
 
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-  <script src="script.js"></script>
+  <script type="module" src="script.js"></script>
 </body>
 </html>

@@ -1,42 +1,1023 @@
-const messagesEl=document.getElementById("messages"),formEl=document.getElementById("chatForm"),inputEl=document.getElementById("messageInput"),newChatBtn=document.getElementById("newChatBtn"),newChatMirror=document.getElementById("newChatMirror"),exportPdfBtn=document.getElementById("exportPdfBtn"),pdfModal=document.getElementById("pdfModal"),pdfEditor=document.getElementById("pdfEditor"),closePdfModal=document.getElementById("closePdfModal"),downloadPdfBtn=document.getElementById("downloadPdfBtn"),chatListEl=document.getElementById("chatList"),chatSearchEl=document.getElementById("chatSearch"),pinChatBtn=document.getElementById("pinChatBtn"),renameChatBtn=document.getElementById("renameChatBtn"),deleteChatBtn=document.getElementById("deleteChatBtn");
-const API_ENDPOINT=window.NEXUS_API_ENDPOINT||"/api/chat",STORAGE_KEY="nexus_rx_chats_v5";
-let chats=loadChats(),currentChatId=null,conversation=[],activeTool="";
-function uid(){return"chat_"+Date.now()+"_"+Math.random().toString(16).slice(2)}
-function loadChats(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||"[]")}catch{return[]}}
-function saveChats(){localStorage.setItem(STORAGE_KEY,JSON.stringify(chats))}
-function getCurrentChat(){return chats.find(c=>c.id===currentChatId)}
-function createChat(title="New Chat"){const chat={id:uid(),title,pinned:false,messages:[],createdAt:Date.now(),updatedAt:Date.now()};chats.unshift(chat);currentChatId=chat.id;conversation=[];saveChats();renderChatList();renderMessages()}
-function updateChat(){const chat=getCurrentChat();if(!chat)return;chat.messages=conversation;chat.updatedAt=Date.now();if(chat.title==="New Chat"){const first=conversation.find(m=>m.role==="user")?.content||"";if(first)chat.title=cleanDisplay(first).slice(0,42)}saveChats();renderChatList()}
-function renderChatList(){const q=(chatSearchEl.value||"").toLowerCase();chatListEl.innerHTML="";chats.filter(c=>!q||c.title.toLowerCase().includes(q)).sort((a,b)=>(b.pinned-a.pinned)||b.updatedAt-a.updatedAt).forEach(chat=>{const b=document.createElement("button");b.className="history-item"+(chat.id===currentChatId?" active":"");b.innerHTML=`<div class="history-title">${chat.pinned?"★ ":""}${escapeHtml(chat.title)}</div><div class="history-date">${new Date(chat.updatedAt).toLocaleDateString()}</div>`;b.onclick=()=>{currentChatId=chat.id;conversation=[...chat.messages];renderChatList();renderMessages()};chatListEl.appendChild(b)})}
-function escapeHtml(s=""){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
-function cleanDisplay(s=""){return stripHtml(String(s||"")).replace(/^@(case|compare|reverse|report|safety)\s*/i,"").trim()||s}
-function stripHtml(s=""){return String(s||"").replace(/<script[\s\S]*?<\/script>/gi,"").replace(/<style[\s\S]*?<\/style>/gi,"").replace(/<\/?[^>]+>/g,"").replace(/&nbsp;/g," ").replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&quot;/g,'"').replace(/&#39;/g,"'")}
-function autoGrow(el){el.style.height="auto";el.style.height=Math.min(el.scrollHeight,160)+"px"}
-function normalizeCommand(t){if(activeTool&&!/^@/.test(t.trim()))return activeTool+t;return t.replace(/^\/قارن\s+/i,"@compare ").replace(/^\/عكس\s+/i,"@reverse ").replace(/^\/تقرير\s*/i,"@report ")}
-function isGreeting(t=""){return/^(hi|hello|hey|اهلا|أهلا|هاي|سلام|السلام عليكم)\s*[!.؟]*$/i.test(t.trim())}
-function isCommandOnly(t=""){return/^@(case|compare|reverse|report|safety)\s*$/i.test(t.trim())}
-function modeFromText(t=""){t=t.toLowerCase();if(t.startsWith("@compare"))return"comparison_mode";if(t.startsWith("@reverse"))return"reverse_mode";if(t.startsWith("@report"))return"report_mode";if(t.startsWith("@case"))return"case_analysis";if(t.startsWith("@safety"))return"drug_safety";if(/interaction|contraindication|warfarin|amiodarone|safe with|together/i.test(t))return"drug_safety";if(/dose|mechanism|uses|side effect|paracetamol|metformin|ramipril|lisinopril/i.test(t))return"drug_info";if(/patient|serum|creatinine|egfr|potassium|bp|hr|مريض/i.test(t))return"case_analysis";return"general_chat"}
-function commandReply(t){t=t.trim().toLowerCase();if(t==="@case")return"Send the case details: age, sex, diagnosis, medications, relevant labs, symptoms, and the exact question.";if(t==="@compare")return"Type the two medicines after the command, for example: @compare ramipril losartan";if(t==="@reverse")return"Type the drug and scenario, for example: @reverse alfuzosin + grapefruit";if(t==="@report")return"Send the case or answer you want converted into an editable report.";if(t==="@safety")return"Send the medicines or medication list you want checked for safety.";return"Send the missing details after the command."}
-function inlineMd(s=""){let x=escapeHtml(s);x=x.replace(/`([^`]+)`/g,"<code>$1</code>").replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>").replace(/\*([^*]+)\*/g,"<em>$1</em>");return x}
-function mdToHtml(md=""){let text=stripHtml(md).trim().replace(/^\s*---+\s*$/gm,"");const blocks=text.split(/\n{2,}/);return blocks.map(block=>{const lines=block.split("\n").filter(Boolean);if(!lines.length)return"";if(lines.length>=2&&lines[0].includes("|")&&/^(\s*\|?\s*:?-{3,}:?\s*\|)+/.test(lines[1])){const h=lines[0].split("|").map(c=>c.trim()).filter(Boolean);const rows=lines.slice(2).map(l=>l.split("|").map(c=>c.trim()).filter(Boolean)).filter(Boolean);return`<table><thead><tr>${h.map(c=>`<th>${inlineMd(c)}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${inlineMd(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`}if(/^#{1,3}\s+/.test(block)){const level=Math.min(block.match(/^#+/)[0].length,3);return`<h${level}>${inlineMd(block.replace(/^#{1,3}\s+/,""))}</h${level}>`}if(lines.every(l=>/^\s*[-*]\s+/.test(l)))return`<ul>${lines.map(l=>`<li>${inlineMd(l.replace(/^\s*[-*]\s+/,""))}</li>`).join("")}</ul>`;if(lines.every(l=>/^\s*\d+\.\s+/.test(l)))return`<ol>${lines.map(l=>`<li>${inlineMd(l.replace(/^\s*\d+\.\s+/,""))}</li>`).join("")}</ol>`;return`<p>${inlineMd(lines.join("<br>"))}</p>`}).join("")}
-function modeLabel(mode){return mode.replace(/_/g,"-")}
-function appendMessage(role,content,mode=""){const wrap=document.createElement("div");wrap.className=`message ${role}`;if(role==="user"){wrap.innerHTML=`<div class="user-bubble">${escapeHtml(cleanDisplay(content)).replace(/\n/g,"<br>")}</div>`}else{wrap.innerHTML=`<div class="assistant-header"><span class="assistant-dot">+</span><span>Nexus Rx · Clinical AI</span><span class="mode-pill pill-${mode||"general_chat"}">${modeLabel(mode||"general_chat")}</span></div><div class="assistant-body">${mdToHtml(content)}</div><div class="disclaimer">Educational decision support only. Verify with primary sources.</div><div class="message-actions"><button data-copy>Copy</button><button data-report>Make report</button><button data-correct>Correct</button></div>`}messagesEl.appendChild(wrap);messagesEl.scrollTop=messagesEl.scrollHeight}
-function appendLoading(){const wrap=document.createElement("div");wrap.className="message assistant";wrap.innerHTML=`<div class="loading"><div class="loading-cube"></div><div><strong>Nexus is checking</strong><br><span>Reviewing clinical context...</span></div></div>`;messagesEl.appendChild(wrap);messagesEl.scrollTop=messagesEl.scrollHeight;return wrap}
-function renderMessages(){messagesEl.innerHTML="";if(!conversation.length){messagesEl.innerHTML=`<div class="welcome"><div class="welcome-mark">Nx</div><h1>How can I help?</h1><p>Ask about drug data, interactions, protocols, or patient cases. Choose a tool to switch mode.</p></div>`;return}conversation.forEach(m=>appendMessage(m.role,m.content,m.mode||""))}
-function cleanModelOutput(t=""){let out=stripHtml(t);out=out.replace(/^\s*prompt the user.*?(?=\n|$)/i,"").replace(/^\s*I need to .*?(?=\n|$)/gim,"").replace(/^\s*I should .*?(?=\n|$)/gim,"").replace(/target=['"]?_blank['"]?/gi,"").replace(/https?:\/\/\S+/gi,"").trim();return out||"Send more details so I can help accurately."}
-async function safeJsonResponse(res){const text=await res.text();try{return JSON.parse(text)}catch{throw new Error(text.trim().startsWith("<")?"API route is not returning JSON. Check Vercel /api/chat.":text.slice(0,160))}}
-async function submitMessage(raw){const userText=normalizeCommand(raw.trim());if(!userText)return;if(!currentChatId)createChat();conversation.push({role:"user",content:userText});updateChat();renderMessages();let mode=modeFromText(userText);if(isGreeting(userText)||isCommandOnly(userText)){const reply=isGreeting(userText)?"Hi. Send a drug, interaction, or patient case and I’ll help.":commandReply(userText);conversation.push({role:"assistant",content:reply,mode});updateChat();renderMessages();return}const loading=appendLoading();try{const res=await fetch(API_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:conversation})});const data=await safeJsonResponse(res);if(!res.ok)throw new Error(data.error||"AI request failed");mode=data.mode||mode;const reply=cleanModelOutput(data.reply||"");loading.remove();conversation.push({role:"assistant",content:reply,mode});updateChat();renderMessages()}catch(e){loading.remove();conversation.push({role:"assistant",content:"Connection error: "+e.message,mode:"general_chat"});updateChat();renderMessages()}}
-formEl.onsubmit=e=>{e.preventDefault();const t=inputEl.value;inputEl.value="";autoGrow(inputEl);submitMessage(t)}
-inputEl.oninput=()=>autoGrow(inputEl)
-newChatBtn.onclick=newChatMirror.onclick=()=>createChat()
-chatSearchEl.oninput=renderChatList
-pinChatBtn.onclick=()=>{const c=getCurrentChat();if(!c)return;c.pinned=!c.pinned;saveChats();renderChatList()}
-renameChatBtn.onclick=()=>{const c=getCurrentChat();if(!c)return;const n=prompt("Chat name:",c.title);if(n){c.title=n.trim();saveChats();renderChatList()}}
-deleteChatBtn.onclick=()=>{if(!currentChatId||!confirm("Delete this chat?"))return;chats=chats.filter(c=>c.id!==currentChatId);currentChatId=chats[0]?.id||null;conversation=getCurrentChat()?.messages||[];saveChats();renderChatList();renderMessages()}
-document.querySelectorAll(".tool-tab").forEach(btn=>btn.onclick=()=>{document.querySelectorAll(".tool-tab").forEach(b=>b.classList.remove("active"));btn.classList.add("active");activeTool=btn.dataset.command||"";inputEl.focus();})
-document.addEventListener("click",e=>{if(e.target.matches("[data-copy]"))navigator.clipboard.writeText(conversation.at(-1)?.content||"");if(e.target.matches("[data-report]")){pdfEditor.value=buildReportText();pdfModal.classList.remove("hidden")}if(e.target.matches("[data-correct]")){inputEl.value="Correction: ";inputEl.focus()}})
-function buildReportText(){return conversation.map(m=>`${m.role==="user"?"User":"Nexus"}:\n${m.content}`).join("\n\n---\n\n")}
-exportPdfBtn.onclick=()=>{pdfEditor.value=buildReportText();pdfModal.classList.remove("hidden")}
-closePdfModal.onclick=()=>pdfModal.classList.add("hidden")
-downloadPdfBtn.onclick=()=>{const{jsPDF}=window.jspdf;const doc=new jsPDF();const lines=doc.splitTextToSize(pdfEditor.value||buildReportText(),180);let y=16;doc.setFontSize(14);doc.text("Nexus Rx Report",14,y);y+=10;doc.setFontSize(10);lines.forEach(line=>{if(y>280){doc.addPage();y=16}doc.text(line,14,y);y+=5.5});doc.save("nexus-rx-report.pdf");pdfModal.classList.add("hidden")}
-if(!chats.length)createChat();else{currentChatId=chats[0].id;conversation=[...(chats[0].messages||[])];renderChatList();renderMessages()}
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
+const API_ENDPOINT = window.NEXUS_API_ENDPOINT || "/api/chat";
+const SUPABASE_URL = window.NEXUS_SUPABASE_URL || "";
+const SUPABASE_ANON_KEY = window.NEXUS_SUPABASE_ANON_KEY || "";
+const HAS_SUPABASE = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+const supabase = HAS_SUPABASE ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+const MODE_META = {
+  case_analysis: {
+    label: "Case Analysis",
+    prompt: "Analyze this case as a clinical pharmacist. Focus on medication-related problems, missing labs, monitoring, red flags, and practical recommendations."
+  },
+  drug_interaction: {
+    label: "Drug Interaction",
+    prompt: "Check this medication combination for interactions, contraindications, severity, mechanism, monitoring, and safer alternatives."
+  },
+  drug_reverse: {
+    label: "Drug Reverse",
+    prompt: "Run an interactive training scenario. Ask me to infer the drug, interaction, or medication problem from clues, then correct me step by step."
+  }
+};
+
+const els = {
+  authPage: document.getElementById("authPage"),
+  appRoot: document.getElementById("appRoot"),
+  authForm: document.getElementById("authForm"),
+  loginTab: document.getElementById("loginTab"),
+  signupTab: document.getElementById("signupTab"),
+  authTitle: document.getElementById("authTitle"),
+  authSubtitle: document.getElementById("authSubtitle"),
+  nameField: document.getElementById("nameField"),
+  nameInput: document.getElementById("nameInput"),
+  emailInput: document.getElementById("emailInput"),
+  passwordInput: document.getElementById("passwordInput"),
+  authSubmitBtn: document.getElementById("authSubmitBtn"),
+  authMessage: document.getElementById("authMessage"),
+  sidebar: document.getElementById("sidebar"),
+  sidebarBackdrop: document.getElementById("sidebarBackdrop"),
+  openSidebarBtn: document.getElementById("openSidebarBtn"),
+  closeSidebarBtn: document.getElementById("closeSidebarBtn"),
+  newChatBtn: document.getElementById("newChatBtn"),
+  chatHistory: document.getElementById("chatHistory"),
+  toggleArchiveBtn: document.getElementById("toggleArchiveBtn"),
+  themeToggleBtn: document.getElementById("themeToggleBtn"),
+  themeIcon: document.getElementById("themeIcon"),
+  userAvatar: document.getElementById("userAvatar"),
+  userName: document.getElementById("userName"),
+  userEmail: document.getElementById("userEmail"),
+  logoutBtn: document.getElementById("logoutBtn"),
+  activeModePill: document.getElementById("activeModePill"),
+  conversationTitle: document.getElementById("conversationTitle"),
+  messages: document.getElementById("messages"),
+  chatForm: document.getElementById("chatForm"),
+  messageInput: document.getElementById("messageInput"),
+  sendBtn: document.getElementById("sendBtn"),
+  stopBtn: document.getElementById("stopBtn"),
+  attachBtn: document.getElementById("attachBtn"),
+  fileInput: document.getElementById("fileInput"),
+  attachedFiles: document.getElementById("attachedFiles"),
+  exportTopBtn: document.getElementById("exportTopBtn"),
+  shareTopBtn: document.getElementById("shareTopBtn"),
+  toast: document.getElementById("toast")
+};
+
+let state = {
+  authMode: "login",
+  user: null,
+  activeMode: "case_analysis",
+  conversations: [],
+  currentConversationId: null,
+  showArchived: false,
+  pendingFiles: [],
+  abortController: null,
+  isGenerating: false,
+  readOnlyShare: false,
+  dropdown: null
+};
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function uid(prefix = "id") {
+  return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
+
+function escapeHtml(text = "") {
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function showToast(message) {
+  els.toast.textContent = message;
+  els.toast.classList.remove("hidden");
+  clearTimeout(showToast.timer);
+  showToast.timer = setTimeout(() => els.toast.classList.add("hidden"), 2500);
+}
+
+function setAuthMessage(message, isError = false) {
+  els.authMessage.textContent = message || "";
+  els.authMessage.style.color = isError ? "var(--danger)" : "var(--muted)";
+}
+
+function localUserKey() { return "nexus_local_user"; }
+function localConversationsKey() { return `nexus_conversations_${state.user?.id || "guest"}`; }
+function localSharesKey() { return "nexus_local_shares"; }
+
+function getLocalJson(key, fallback) {
+  try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); }
+  catch { return fallback; }
+}
+
+function setLocalJson(key, value) {
+  localStorage.setItem(key, JSON.stringify(value));
+}
+
+function normalizeConversation(row) {
+  return {
+    id: row.id,
+    user_id: row.user_id || state.user?.id || "local",
+    title: row.title || "New chat",
+    mode: row.mode || "case_analysis",
+    messages: Array.isArray(row.messages) ? row.messages : [],
+    pinned: Boolean(row.pinned),
+    archived: Boolean(row.archived),
+    created_at: row.created_at || nowIso(),
+    updated_at: row.updated_at || nowIso()
+  };
+}
+
+function currentConversation() {
+  return state.conversations.find(c => c.id === state.currentConversationId) || null;
+}
+
+function setAuthMode(mode) {
+  state.authMode = mode;
+  const isSignup = mode === "signup";
+  els.loginTab.classList.toggle("active", !isSignup);
+  els.signupTab.classList.toggle("active", isSignup);
+  els.nameField.classList.toggle("hidden", !isSignup);
+  els.nameInput.required = isSignup;
+  els.authTitle.textContent = isSignup ? "Create account" : "Welcome back";
+  els.authSubtitle.textContent = isSignup ? "Start a secure clinical workspace." : "Login to continue your clinical workspace.";
+  els.authSubmitBtn.textContent = isSignup ? "Create account" : "Login";
+  els.passwordInput.autocomplete = isSignup ? "new-password" : "current-password";
+  setAuthMessage("");
+}
+
+async function handleAuthSubmit(event) {
+  event.preventDefault();
+  const email = els.emailInput.value.trim();
+  const password = els.passwordInput.value;
+  const fullName = els.nameInput.value.trim() || email.split("@")[0];
+  setAuthMessage("Working…");
+  els.authSubmitBtn.disabled = true;
+
+  try {
+    if (HAS_SUPABASE) {
+      if (state.authMode === "signup") {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { data: { full_name: fullName } }
+        });
+        if (error) throw error;
+        if (!data.session) {
+          setAuthMessage("Account created. Check your email if confirmation is enabled.");
+          return;
+        }
+        await enterApp(data.user || data.session.user);
+      } else {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        await enterApp(data.user || data.session.user);
+      }
+    } else {
+      const user = { id: "local_user", email, user_metadata: { full_name: fullName } };
+      setLocalJson(localUserKey(), user);
+      await enterApp(user);
+    }
+  } catch (error) {
+    setAuthMessage(error.message || "Authentication failed.", true);
+  } finally {
+    els.authSubmitBtn.disabled = false;
+  }
+}
+
+function showAuth() {
+  els.authPage.classList.remove("hidden");
+  els.appRoot.classList.add("hidden");
+}
+
+async function enterApp(user, options = {}) {
+  state.user = user;
+  state.readOnlyShare = Boolean(options.readOnlyShare);
+  els.authPage.classList.add("hidden");
+  els.appRoot.classList.remove("hidden");
+  updateUserCard();
+  applyTheme(localStorage.getItem("nexus_theme") || "light");
+
+  if (state.readOnlyShare) {
+    renderHistory();
+    renderCurrentConversation();
+    setComposerDisabled(true);
+    return;
+  }
+
+  setComposerDisabled(false);
+  await loadConversations();
+  if (!state.conversations.length) {
+    await createNewConversation(false);
+  } else {
+    state.currentConversationId = state.conversations[0].id;
+    selectMode(state.conversations[0].mode || "case_analysis", false);
+    renderAll();
+  }
+}
+
+function updateUserCard() {
+  const name = state.user?.user_metadata?.full_name || state.user?.email?.split("@")[0] || "User";
+  const email = state.user?.email || (state.readOnlyShare ? "Shared conversation" : "Local demo");
+  els.userName.textContent = name;
+  els.userEmail.textContent = email;
+  els.userAvatar.textContent = name.slice(0, 1).toUpperCase();
+}
+
+async function logout() {
+  if (HAS_SUPABASE && !state.readOnlyShare) {
+    await supabase.auth.signOut();
+  } else {
+    localStorage.removeItem(localUserKey());
+  }
+  state.user = null;
+  state.conversations = [];
+  state.currentConversationId = null;
+  state.readOnlyShare = false;
+  showAuth();
+}
+
+async function loadConversations() {
+  if (!state.user) return;
+
+  if (HAS_SUPABASE) {
+    const { data, error } = await supabase
+      .from("conversations")
+      .select("*")
+      .eq("archived", state.showArchived)
+      .order("pinned", { ascending: false })
+      .order("updated_at", { ascending: false });
+    if (error) {
+      showToast("Supabase tables not ready. Check README SQL.");
+      console.error(error);
+      state.conversations = [];
+      return;
+    }
+    state.conversations = (data || []).map(normalizeConversation);
+  } else {
+    state.conversations = getLocalJson(localConversationsKey(), [])
+      .map(normalizeConversation)
+      .filter(c => c.archived === state.showArchived)
+      .sort((a, b) => Number(b.pinned) - Number(a.pinned) || new Date(b.updated_at) - new Date(a.updated_at));
+  }
+}
+
+async function persistConversation(conversation, patch = {}) {
+  const updated = normalizeConversation({ ...conversation, ...patch, updated_at: nowIso() });
+
+  if (HAS_SUPABASE && !state.readOnlyShare) {
+    const { data, error } = await supabase
+      .from("conversations")
+      .update({
+        title: updated.title,
+        mode: updated.mode,
+        messages: updated.messages,
+        pinned: updated.pinned,
+        archived: updated.archived,
+        updated_at: updated.updated_at
+      })
+      .eq("id", updated.id)
+      .select()
+      .single();
+    if (error) throw error;
+    replaceConversation(normalizeConversation(data));
+  } else {
+    const all = getLocalJson(localConversationsKey(), []);
+    const index = all.findIndex(c => c.id === updated.id);
+    if (index >= 0) all[index] = updated;
+    else all.push(updated);
+    setLocalJson(localConversationsKey(), all);
+    replaceConversation(updated);
+  }
+
+  renderAll();
+}
+
+function replaceConversation(conversation) {
+  const visible = conversation.archived === state.showArchived;
+  const index = state.conversations.findIndex(c => c.id === conversation.id);
+  if (visible) {
+    if (index >= 0) state.conversations[index] = conversation;
+    else state.conversations.unshift(conversation);
+  } else if (index >= 0) {
+    state.conversations.splice(index, 1);
+  }
+  state.conversations.sort((a, b) => Number(b.pinned) - Number(a.pinned) || new Date(b.updated_at) - new Date(a.updated_at));
+}
+
+async function createNewConversation(render = true) {
+  const conversation = normalizeConversation({
+    id: uid("chat"),
+    user_id: state.user?.id || "local",
+    title: "New clinical chat",
+    mode: state.activeMode,
+    messages: [],
+    pinned: false,
+    archived: false,
+    created_at: nowIso(),
+    updated_at: nowIso()
+  });
+
+  if (HAS_SUPABASE && !state.readOnlyShare) {
+    const { data, error } = await supabase
+      .from("conversations")
+      .insert({
+        user_id: state.user.id,
+        title: conversation.title,
+        mode: conversation.mode,
+        messages: conversation.messages,
+        pinned: false,
+        archived: false
+      })
+      .select()
+      .single();
+    if (error) {
+      showToast("Could not create chat. Check Supabase table/RLS.");
+      console.error(error);
+      return;
+    }
+    state.conversations.unshift(normalizeConversation(data));
+    state.currentConversationId = data.id;
+  } else {
+    const all = getLocalJson(localConversationsKey(), []);
+    all.unshift(conversation);
+    setLocalJson(localConversationsKey(), all);
+    state.conversations.unshift(conversation);
+    state.currentConversationId = conversation.id;
+  }
+
+  const selected = currentConversation();
+  selectMode(selected?.mode || state.activeMode, false);
+  if (render) renderAll();
+}
+
+async function deleteConversation(conversation) {
+  if (!conversation) return;
+  if (!confirm("Delete this conversation permanently?")) return;
+
+  if (HAS_SUPABASE && !state.readOnlyShare) {
+    const { error } = await supabase.from("conversations").delete().eq("id", conversation.id);
+    if (error) return showToast(error.message);
+  } else {
+    const all = getLocalJson(localConversationsKey(), []).filter(c => c.id !== conversation.id);
+    setLocalJson(localConversationsKey(), all);
+  }
+
+  state.conversations = state.conversations.filter(c => c.id !== conversation.id);
+  if (state.currentConversationId === conversation.id) {
+    if (state.conversations[0]) state.currentConversationId = state.conversations[0].id;
+    else await createNewConversation(false);
+  }
+  renderAll();
+}
+
+function selectMode(mode, persist = true) {
+  state.activeMode = MODE_META[mode] ? mode : "case_analysis";
+  document.body.dataset.mode = state.activeMode;
+  document.querySelectorAll(".mode-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.mode === state.activeMode);
+  });
+  els.activeModePill.textContent = MODE_META[state.activeMode].label;
+
+  const conversation = currentConversation();
+  if (conversation && persist && !state.readOnlyShare) {
+    persistConversation(conversation, { mode: state.activeMode }).catch(err => showToast(err.message));
+  }
+}
+
+function applyTheme(theme) {
+  const safeTheme = theme === "dark" ? "dark" : "light";
+  document.body.dataset.theme = safeTheme;
+  localStorage.setItem("nexus_theme", safeTheme);
+  els.themeIcon.textContent = safeTheme === "dark" ? "☀" : "☾";
+  els.themeToggleBtn.querySelector("span:last-child").textContent = safeTheme === "dark" ? "Light mode" : "Dark mode";
+}
+
+function renderAll() {
+  renderHistory();
+  renderCurrentConversation();
+}
+
+function renderHistory() {
+  els.chatHistory.innerHTML = "";
+  els.toggleArchiveBtn.classList.toggle("active", state.showArchived);
+  els.toggleArchiveBtn.textContent = state.showArchived ? "Active" : "Archive";
+
+  if (state.readOnlyShare) {
+    els.chatHistory.innerHTML = `<div class="empty-state">You are viewing a shared read-only conversation.</div>`;
+    return;
+  }
+
+  if (!state.conversations.length) {
+    els.chatHistory.innerHTML = `<div class="empty-state">No ${state.showArchived ? "archived" : "active"} conversations yet.</div>`;
+    return;
+  }
+
+  state.conversations.forEach(conversation => {
+    const row = document.createElement("div");
+    row.className = "history-row";
+    row.role = "listitem";
+    row.innerHTML = `
+      <button class="history-item ${conversation.id === state.currentConversationId ? "active" : ""}" type="button">
+        <div class="history-title">${conversation.pinned ? "📌" : ""}<span>${escapeHtml(conversation.title)}</span></div>
+        <div class="history-meta">${MODE_META[conversation.mode]?.label || "General"} · ${formatDate(conversation.updated_at)}</div>
+      </button>
+      <button class="history-dots" type="button" aria-label="Conversation actions">•••</button>
+    `;
+    row.querySelector(".history-item").addEventListener("click", () => {
+      state.currentConversationId = conversation.id;
+      selectMode(conversation.mode || "case_analysis", false);
+      renderAll();
+      closeSidebarMobile();
+    });
+    row.querySelector(".history-dots").addEventListener("click", (event) => openConversationMenu(event, conversation));
+    els.chatHistory.appendChild(row);
+  });
+}
+
+function formatDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "now";
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function renderCurrentConversation() {
+  const conversation = currentConversation();
+  els.messages.innerHTML = `<div class="messages-inner" id="messagesInner"></div>`;
+  const inner = document.getElementById("messagesInner");
+
+  if (!conversation) {
+    inner.appendChild(welcomeNode());
+    return;
+  }
+
+  els.conversationTitle.textContent = conversation.title || "New clinical chat";
+  els.activeModePill.textContent = MODE_META[conversation.mode]?.label || MODE_META[state.activeMode].label;
+  if (!conversation.messages.length) {
+    inner.appendChild(welcomeNode());
+  } else {
+    conversation.messages.forEach(message => {
+      inner.appendChild(createMessageNode(message.role, message.content, {
+        mode: message.mode,
+        thinkingTime: message.thinkingTime,
+        attachments: message.attachments || []
+      }));
+    });
+  }
+  scrollToBottom();
+}
+
+function welcomeNode() {
+  const node = document.createElement("div");
+  node.className = "welcome";
+  node.innerHTML = `
+    <div class="welcome-card">
+      <div class="welcome-mark">Nx</div>
+      <h2>How can I help?</h2>
+      <p>Choose a mode from the sidebar, attach case files if needed, and ask naturally. The active tool gently changes the workspace theme.</p>
+      <div class="prompt-grid">
+        <button class="prompt-card" data-prompt="65-year-old male on ramipril + potassium supplement. No recent K or SCr. Analyze the risk.">
+          <strong>Case Analysis</strong><span>Analyze a patient case with missing information.</span>
+        </button>
+        <button class="prompt-card" data-prompt="Check interaction: warfarin with amiodarone. Include mechanism, monitoring, and action plan.">
+          <strong>Drug Interaction</strong><span>Safety check with severity and monitoring.</span>
+        </button>
+        <button class="prompt-card" data-prompt="Start Drug Reverse training for ACE inhibitors and hyperkalemia risk.">
+          <strong>Drug Reverse</strong><span>Interactive training with clues and correction.</span>
+        </button>
+      </div>
+    </div>
+  `;
+  node.querySelectorAll("[data-prompt]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      els.messageInput.value = btn.dataset.prompt;
+      autoGrow(els.messageInput);
+      els.messageInput.focus();
+    });
+  });
+  return node;
+}
+
+function createMessageNode(role, content, options = {}) {
+  const row = document.createElement("div");
+  row.className = `message-row ${role}`;
+
+  const meta = document.createElement("div");
+  meta.className = "message-meta";
+  meta.innerHTML = `<span class="message-avatar">${role === "assistant" ? "Nx" : "You"}</span><span>${role === "assistant" ? "Nexus" : "You"}</span>`;
+
+  const body = document.createElement("div");
+  body.className = "message-content";
+  body.innerHTML = role === "assistant" ? renderMarkdown(content) : escapeHtml(content).replace(/\n/g, "<br>");
+
+  if (options.attachments?.length && role === "user") {
+    const files = document.createElement("div");
+    files.className = "attached-files";
+    options.attachments.forEach(file => {
+      const chip = document.createElement("span");
+      chip.className = "file-chip";
+      chip.textContent = `📎 ${file.name}`;
+      files.appendChild(chip);
+    });
+    body.appendChild(files);
+  }
+
+  if (role === "assistant" && options.thinkingTime) {
+    const thinking = document.createElement("div");
+    thinking.className = "thinking-time";
+    thinking.textContent = `Thinking time: ${options.thinkingTime.toFixed(1)}s`;
+    body.prepend(thinking);
+  }
+
+  if (role === "assistant") {
+    const disclaimer = document.createElement("div");
+    disclaimer.className = "disclaimer";
+    disclaimer.textContent = "Educational clinical decision support only. Confirm critical decisions with trusted references and local protocols.";
+    body.appendChild(disclaimer);
+  }
+
+  row.appendChild(meta);
+  row.appendChild(body);
+  return row;
+}
+
+function renderMarkdown(text = "") {
+  let source = String(text || "");
+  source = source.replace(/^>\s*\[!(INFO|WARNING|IMPORTANT|TIP|NOTE)\]\s*/gim, "> **$1** — ");
+  if (window.marked && window.DOMPurify) {
+    const html = window.marked.parse(source, { breaks: true, gfm: true });
+    return window.DOMPurify.sanitize(html);
+  }
+  return escapeHtml(source).replace(/\n/g, "<br>");
+}
+
+function scrollToBottom() {
+  els.messages.scrollTop = els.messages.scrollHeight;
+}
+
+function autoGrow(el) {
+  el.style.height = "auto";
+  el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
+}
+
+async function sendMessage(event) {
+  event.preventDefault();
+  if (state.isGenerating || state.readOnlyShare) return;
+
+  let conversation = currentConversation();
+  if (!conversation) {
+    await createNewConversation(false);
+    conversation = currentConversation();
+  }
+
+  const text = els.messageInput.value.trim();
+  if (!text && !state.pendingFiles.length) return;
+
+  const attachments = await buildAttachmentPayloads(state.pendingFiles);
+  const userContent = text || "[Attached files for case analysis]";
+
+  const userMessage = {
+    role: "user",
+    content: userContent,
+    mode: state.activeMode,
+    attachments,
+    created_at: nowIso()
+  };
+
+  conversation.messages.push(userMessage);
+  if (conversation.title === "New clinical chat") conversation.title = makeTitle(userContent);
+  conversation.mode = state.activeMode;
+  conversation.updated_at = nowIso();
+
+  els.messageInput.value = "";
+  autoGrow(els.messageInput);
+  state.pendingFiles = [];
+  renderFileChips();
+  renderCurrentConversation();
+  await persistConversation(conversation, conversation);
+
+  await streamAssistantReply(conversation);
+}
+
+function makeTitle(text) {
+  return text.replace(/\s+/g, " ").slice(0, 44) || "Attached case";
+}
+
+async function buildAttachmentPayloads(files) {
+  const payloads = [];
+  for (const file of files) {
+    const item = {
+      name: file.name,
+      type: file.type || "application/octet-stream",
+      size: file.size
+    };
+    if (/^(text\/|application\/json|text\/csv)/.test(item.type) || /\.(txt|md|csv|json)$/i.test(file.name)) {
+      item.text = await file.text();
+      if (item.text.length > 12000) item.text = `${item.text.slice(0, 12000)}\n\n[File truncated after 12,000 characters]`;
+    }
+    payloads.push(item);
+  }
+  return payloads;
+}
+
+async function streamAssistantReply(conversation) {
+  const assistantMessage = {
+    role: "assistant",
+    content: "",
+    mode: state.activeMode,
+    created_at: nowIso(),
+    thinkingTime: 0
+  };
+  conversation.messages.push(assistantMessage);
+  renderCurrentConversation();
+
+  const inner = document.getElementById("messagesInner");
+  const assistantRow = inner.lastElementChild;
+  const assistantBody = assistantRow.querySelector(".message-content");
+  assistantBody.innerHTML = `
+    <div class="thinking-box">
+      <span class="loader-dots"><span></span><span></span><span></span></span>
+      <span>Thinking… <b id="thinkingCounter">0.0s</b></span>
+    </div>
+  `;
+
+  state.isGenerating = true;
+  state.abortController = new AbortController();
+  els.stopBtn.classList.remove("hidden");
+  els.sendBtn.disabled = true;
+
+  const start = performance.now();
+  let firstChunk = false;
+  const timer = setInterval(() => {
+    const counter = document.getElementById("thinkingCounter");
+    if (counter) counter.textContent = `${((performance.now() - start) / 1000).toFixed(1)}s`;
+  }, 100);
+
+  try {
+    const response = await fetch(API_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mode: state.activeMode,
+        modeInstruction: MODE_META[state.activeMode].prompt,
+        messages: conversation.messages.filter(m => m.role === "user" || m.role === "assistant").map(m => ({
+          role: m.role,
+          content: m.content,
+          attachments: m.attachments || []
+        })),
+        stream: true
+      }),
+      signal: state.abortController.signal
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(parseErrorText(errorText) || `Request failed (${response.status})`);
+    }
+
+    const contentType = response.headers.get("content-type") || "";
+    if (response.body && !contentType.includes("application/json")) {
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        if (!firstChunk) {
+          firstChunk = true;
+          assistantMessage.thinkingTime = (performance.now() - start) / 1000;
+          assistantBody.innerHTML = "";
+        }
+        buffer += chunk;
+        assistantMessage.content = buffer;
+        assistantBody.innerHTML = renderMarkdown(buffer);
+        scrollToBottom();
+      }
+    } else {
+      const data = await response.json();
+      assistantMessage.content = data.reply || "No response returned.";
+      assistantMessage.thinkingTime = (performance.now() - start) / 1000;
+      await typeText(assistantMessage.content, assistantBody, assistantMessage);
+    }
+
+    if (!assistantMessage.content.trim()) assistantMessage.content = "No response returned.";
+    finalizeAssistantNode(assistantBody, assistantMessage);
+    await persistConversation(conversation, conversation);
+  } catch (error) {
+    if (error.name === "AbortError") {
+      assistantMessage.content = `${assistantMessage.content}\n\n> [!NOTE] Generation stopped by user.`.trim();
+    } else {
+      assistantMessage.content = `### Connection error\n${error.message}`;
+    }
+    assistantMessage.thinkingTime = (performance.now() - start) / 1000;
+    finalizeAssistantNode(assistantBody, assistantMessage);
+    await persistConversation(conversation, conversation).catch(console.error);
+  } finally {
+    clearInterval(timer);
+    state.isGenerating = false;
+    state.abortController = null;
+    els.stopBtn.classList.add("hidden");
+    els.sendBtn.disabled = false;
+  }
+}
+
+function finalizeAssistantNode(body, message) {
+  body.innerHTML = renderMarkdown(message.content);
+  if (message.thinkingTime) {
+    const thinking = document.createElement("div");
+    thinking.className = "thinking-time";
+    thinking.textContent = `Thinking time: ${message.thinkingTime.toFixed(1)}s`;
+    body.prepend(thinking);
+  }
+  const disclaimer = document.createElement("div");
+  disclaimer.className = "disclaimer";
+  disclaimer.textContent = "Educational clinical decision support only. Confirm critical decisions with trusted references and local protocols.";
+  body.appendChild(disclaimer);
+  scrollToBottom();
+}
+
+async function typeText(text, element, message) {
+  let output = "";
+  for (const char of text) {
+    output += char;
+    message.content = output;
+    element.innerHTML = renderMarkdown(output);
+    await new Promise(resolve => setTimeout(resolve, 4));
+  }
+}
+
+function parseErrorText(text) {
+  try {
+    const data = JSON.parse(text);
+    return data.error || data.details?.error?.message || text;
+  } catch {
+    if (text.trim().startsWith("<")) return "The API route is not available here. Deploy frontend and /api/chat on Vercel, or set NEXUS_API_ENDPOINT to your Vercel API URL.";
+    return text.slice(0, 240);
+  }
+}
+
+function setComposerDisabled(disabled) {
+  els.messageInput.disabled = disabled;
+  els.attachBtn.disabled = disabled;
+  els.sendBtn.disabled = disabled;
+  els.messageInput.placeholder = disabled ? "Shared conversation is read-only" : "Message Nexus…";
+}
+
+function renderFileChips() {
+  els.attachedFiles.innerHTML = "";
+  els.attachedFiles.classList.toggle("hidden", state.pendingFiles.length === 0);
+  state.pendingFiles.forEach((file, index) => {
+    const chip = document.createElement("span");
+    chip.className = "file-chip";
+    chip.innerHTML = `📎 ${escapeHtml(file.name)} <button type="button" aria-label="Remove file">×</button>`;
+    chip.querySelector("button").addEventListener("click", () => {
+      state.pendingFiles.splice(index, 1);
+      renderFileChips();
+    });
+    els.attachedFiles.appendChild(chip);
+  });
+}
+
+function openConversationMenu(event, conversation) {
+  event.stopPropagation();
+  closeDropdown();
+
+  const rect = event.currentTarget.getBoundingClientRect();
+  const menu = document.createElement("div");
+  menu.className = "dropdown";
+  menu.style.top = `${Math.min(rect.bottom + 6, window.innerHeight - 260)}px`;
+  menu.style.left = `${Math.min(rect.left - 156, window.innerWidth - 210)}px`;
+  menu.innerHTML = `
+    <button class="menu-btn" data-action="pin">${conversation.pinned ? "Unpin" : "Pin"}</button>
+    <button class="menu-btn" data-action="rename">Rename</button>
+    <button class="menu-btn" data-action="export">Export as PDF</button>
+    <button class="menu-btn" data-action="share">Share</button>
+    <button class="menu-btn" data-action="archive">${conversation.archived ? "Unarchive" : "Archive"}</button>
+    <button class="menu-btn danger" data-action="delete">Delete</button>
+  `;
+  menu.addEventListener("click", async (e) => {
+    const action = e.target.closest("[data-action]")?.dataset.action;
+    if (!action) return;
+    closeDropdown();
+    await handleConversationAction(action, conversation);
+  });
+  document.body.appendChild(menu);
+  state.dropdown = menu;
+}
+
+async function handleConversationAction(action, conversation) {
+  if (action === "pin") return persistConversation(conversation, { pinned: !conversation.pinned });
+  if (action === "rename") {
+    const title = prompt("New conversation name", conversation.title);
+    if (title?.trim()) await persistConversation(conversation, { title: title.trim() });
+    return;
+  }
+  if (action === "export") return exportConversationPdf(conversation);
+  if (action === "share") return shareConversation(conversation);
+  if (action === "archive") {
+    await persistConversation(conversation, { archived: !conversation.archived });
+    if (state.currentConversationId === conversation.id) {
+      state.currentConversationId = state.conversations[0]?.id || null;
+      if (!state.currentConversationId && !state.showArchived) await createNewConversation(false);
+      renderAll();
+    }
+    return;
+  }
+  if (action === "delete") return deleteConversation(conversation);
+}
+
+function closeDropdown() {
+  if (state.dropdown) {
+    state.dropdown.remove();
+    state.dropdown = null;
+  }
+}
+
+async function shareConversation(conversation) {
+  if (!conversation) return;
+  let url = "";
+  try {
+    if (HAS_SUPABASE && !state.readOnlyShare) {
+      const { data, error } = await supabase
+        .from("conversation_shares")
+        .insert({
+          conversation_id: conversation.id,
+          owner_id: state.user.id,
+          title: conversation.title,
+          mode: conversation.mode,
+          messages: conversation.messages
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+      url = `${location.origin}${location.pathname}?share=${data.id}`;
+    } else {
+      const shareId = uid("share");
+      const shares = getLocalJson(localSharesKey(), {});
+      shares[shareId] = conversation;
+      setLocalJson(localSharesKey(), shares);
+      url = `${location.origin}${location.pathname}?share=${shareId}`;
+    }
+    await navigator.clipboard.writeText(url);
+    showToast("Share link copied");
+  } catch (error) {
+    showToast(error.message || "Could not create share link");
+  }
+}
+
+async function loadSharedConversation(shareId) {
+  let shared = null;
+  if (HAS_SUPABASE) {
+    const { data, error } = await supabase.rpc("get_shared_conversation", { p_share_id: shareId });
+    if (!error && data && data.length) shared = data[0];
+  }
+  if (!shared) {
+    const shares = getLocalJson(localSharesKey(), {});
+    shared = shares[shareId];
+  }
+
+  if (!shared) {
+    showToast("Shared conversation not found");
+    showAuth();
+    return false;
+  }
+
+  const conversation = normalizeConversation({
+    ...shared,
+    id: shared.id || shareId,
+    title: `${shared.title || "Shared chat"} (shared)`,
+    messages: Array.isArray(shared.messages) ? shared.messages : []
+  });
+  state.conversations = [conversation];
+  state.currentConversationId = conversation.id;
+  state.activeMode = conversation.mode || "case_analysis";
+  selectMode(state.activeMode, false);
+  await enterApp({ id: "shared_viewer", email: "Shared conversation", user_metadata: { full_name: "Shared" } }, { readOnlyShare: true });
+  return true;
+}
+
+function exportConversationPdf(conversation = currentConversation()) {
+  if (!conversation) return;
+  const { jsPDF } = window.jspdf || {};
+  if (!jsPDF) return showToast("jsPDF not loaded");
+
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const margin = 14;
+  let y = 18;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(15);
+  doc.text(conversation.title || "Nexus report", margin, y);
+  y += 8;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.text(`${MODE_META[conversation.mode]?.label || "Chat"} · ${new Date().toLocaleString()}`, margin, y);
+  y += 10;
+
+  const body = conversation.messages.map(msg => {
+    const role = msg.role === "assistant" ? "Nexus" : "User";
+    const files = msg.attachments?.length ? `\nAttachments: ${msg.attachments.map(f => f.name).join(", ")}` : "";
+    return `${role}:\n${msg.content}${files}`;
+  }).join("\n\n---\n\n");
+
+  const lines = doc.splitTextToSize(body, 180);
+  doc.setFontSize(10);
+  lines.forEach(line => {
+    if (y > 282) { doc.addPage(); y = 18; }
+    doc.text(line, margin, y);
+    y += 5.4;
+  });
+  doc.save(`${safeFilename(conversation.title || "nexus-chat")}.pdf`);
+}
+
+function safeFilename(name) {
+  return name.toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/gi, "-").replace(/^-|-$/g, "").slice(0, 70) || "nexus-chat";
+}
+
+function openSidebarMobile() {
+  els.sidebar.classList.add("open");
+  els.sidebarBackdrop.classList.add("show");
+}
+
+function closeSidebarMobile() {
+  els.sidebar.classList.remove("open");
+  els.sidebarBackdrop.classList.remove("show");
+}
+
+function bindEvents() {
+  els.loginTab.addEventListener("click", () => setAuthMode("login"));
+  els.signupTab.addEventListener("click", () => setAuthMode("signup"));
+  els.authForm.addEventListener("submit", handleAuthSubmit);
+  els.logoutBtn.addEventListener("click", logout);
+  els.newChatBtn.addEventListener("click", () => createNewConversation(true));
+  els.themeToggleBtn.addEventListener("click", () => applyTheme(document.body.dataset.theme === "dark" ? "light" : "dark"));
+  els.openSidebarBtn.addEventListener("click", openSidebarMobile);
+  els.closeSidebarBtn.addEventListener("click", closeSidebarMobile);
+  els.sidebarBackdrop.addEventListener("click", closeSidebarMobile);
+  els.toggleArchiveBtn.addEventListener("click", async () => {
+    state.showArchived = !state.showArchived;
+    await loadConversations();
+    state.currentConversationId = state.conversations[0]?.id || null;
+    renderAll();
+  });
+  document.querySelectorAll(".mode-btn").forEach(btn => {
+    btn.addEventListener("click", () => selectMode(btn.dataset.mode));
+  });
+  els.chatForm.addEventListener("submit", sendMessage);
+  els.messageInput.addEventListener("input", () => autoGrow(els.messageInput));
+  els.messageInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      els.chatForm.requestSubmit();
+    }
+  });
+  els.attachBtn.addEventListener("click", () => els.fileInput.click());
+  els.fileInput.addEventListener("change", () => {
+    state.pendingFiles.push(...Array.from(els.fileInput.files || []));
+    els.fileInput.value = "";
+    renderFileChips();
+  });
+  els.stopBtn.addEventListener("click", () => state.abortController?.abort());
+  els.exportTopBtn.addEventListener("click", () => exportConversationPdf());
+  els.shareTopBtn.addEventListener("click", () => shareConversation(currentConversation()));
+  document.addEventListener("click", (event) => {
+    if (state.dropdown && !event.target.closest(".dropdown") && !event.target.closest(".history-dots")) closeDropdown();
+  });
+}
+
+async function init() {
+  bindEvents();
+  setAuthMode("login");
+  applyTheme(localStorage.getItem("nexus_theme") || "light");
+
+  const params = new URLSearchParams(location.search);
+  const shareId = params.get("share");
+  if (shareId) {
+    await loadSharedConversation(shareId);
+    return;
+  }
+
+  if (HAS_SUPABASE) {
+    const { data } = await supabase.auth.getSession();
+    supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user && !state.user) enterApp(session.user);
+      if (!session?.user && state.user && !state.readOnlyShare) showAuth();
+    });
+    if (data.session?.user) await enterApp(data.session.user);
+    else showAuth();
+  } else {
+    const localUser = getLocalJson(localUserKey(), null);
+    if (localUser) await enterApp(localUser);
+    else showAuth();
+  }
+}
+
+init().catch(error => {
+  console.error(error);
+  showToast(error.message || "App failed to start");
+});
