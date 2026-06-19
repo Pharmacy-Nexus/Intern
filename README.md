@@ -6,14 +6,15 @@ A clean ChatGPT-inspired professional chat workspace with:
 - Optional Supabase Auth + database persistence
 - Local demo fallback when Supabase keys are empty
 - Responsive collapsible sidebar
-- Three modes: Case Analysis, Drug Interaction, Drug Reverse
-- Chat history with Pin, Rename, Export PDF, Share, Archive, Delete
+- Four modes: General Chat, Case Analysis, Drug Interaction, Drug Reverse
+- Chat history with auto-title from the first message, Pin, Rename, Export PDF, Share, Archive, Delete
 - Dark / Light mode
 - Markdown AI responses, callouts, tables, and code blocks
 - Streaming response UI + thinking timer
 - Stop Generating button
 - Auto-resizing input
 - File attachment UI for PDFs/images/text files
+- Cleaner PDF export using html2pdf.js for better visual formatting
 
 ---
 
@@ -78,8 +79,8 @@ Open Supabase → SQL Editor → run this:
 create table if not exists public.conversations (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
-  title text not null default 'New clinical chat',
-  mode text not null default 'case_analysis',
+  title text not null default 'New chat',
+  mode text not null default 'general_chat',
   messages jsonb not null default '[]'::jsonb,
   pinned boolean not null default false,
   archived boolean not null default false,
@@ -126,7 +127,7 @@ create table if not exists public.conversation_shares (
   conversation_id uuid references public.conversations(id) on delete cascade,
   owner_id uuid not null references auth.users(id) on delete cascade,
   title text not null,
-  mode text not null default 'case_analysis',
+  mode text not null default 'general_chat',
   messages jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now()
 );
@@ -194,3 +195,7 @@ For the API route, deploy to Vercel or use Vercel dev:
 ```bash
 vercel dev
 ```
+
+## v3 responsive note
+
+This version switches into the compact shell earlier, so the mobile-style layout is triggered at normal 100% browser zoom on laptop/mobile preview tools. You should not need to zoom to 200% to make the layout behave.

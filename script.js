@@ -7,6 +7,10 @@ const HAS_SUPABASE = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 const supabase = HAS_SUPABASE ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
 const MODE_META = {
+  general_chat: {
+    label: "General Chat",
+    prompt: "Answer normally without forcing a clinical tool. If the user asks a clinical/pharmacy question, stay practical and structured, but do not over-format unless needed."
+  },
   case_analysis: {
     label: "Case Analysis",
     prompt: "Analyze this case as a clinical pharmacist. Focus on medication-related problems, missing labs, monitoring, red flags, and practical recommendations."
@@ -66,7 +70,7 @@ const els = {
 let state = {
   authMode: "login",
   user: null,
-  activeMode: "case_analysis",
+  activeMode: "general_chat",
   conversations: [],
   currentConversationId: null,
   showArchived: false,
@@ -123,7 +127,7 @@ function normalizeConversation(row) {
     id: row.id,
     user_id: row.user_id || state.user?.id || "local",
     title: row.title || "New chat",
-    mode: row.mode || "case_analysis",
+    mode: row.mode || "general_chat",
     messages: Array.isArray(row.messages) ? row.messages : [],
     pinned: Boolean(row.pinned),
     archived: Boolean(row.archived),
@@ -190,11 +194,13 @@ async function handleAuthSubmit(event) {
 }
 
 function showAuth() {
+  document.body.classList.remove("app-active", "generating");
   els.authPage.classList.remove("hidden");
   els.appRoot.classList.add("hidden");
 }
 
 async function enterApp(user, options = {}) {
+  document.body.classList.add("app-active");
   state.user = user;
   state.readOnlyShare = Boolean(options.readOnlyShare);
   els.authPage.classList.add("hidden");
@@ -215,7 +221,7 @@ async function enterApp(user, options = {}) {
     await createNewConversation(false);
   } else {
     state.currentConversationId = state.conversations[0].id;
-    selectMode(state.conversations[0].mode || "case_analysis", false);
+    selectMode(state.conversations[0].mode || "general_chat", false);
     renderAll();
   }
 }
@@ -313,8 +319,8 @@ async function createNewConversation(render = true) {
   const conversation = normalizeConversation({
     id: uid("chat"),
     user_id: state.user?.id || "local",
-    title: "New clinical chat",
-    mode: state.activeMode,
+    title: "",
+    mode: state.activeMode || "general_chat",
     messages: [],
     pinned: false,
     archived: false,
@@ -327,7 +333,7 @@ async function createNewConversation(render = true) {
       .from("conversations")
       .insert({
         user_id: state.user.id,
-        title: conversation.title,
+        title: conversation.title || "New chat",
         mode: conversation.mode,
         messages: conversation.messages,
         pinned: false,
@@ -376,12 +382,12 @@ async function deleteConversation(conversation) {
 }
 
 function selectMode(mode, persist = true) {
-  state.activeMode = MODE_META[mode] ? mode : "case_analysis";
+  state.activeMode = MODE_META[mode] ? mode : "general_chat";
   document.body.dataset.mode = state.activeMode;
   document.querySelectorAll(".mode-btn").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.mode === state.activeMode);
   });
-  els.activeModePill.textContent = MODE_META[state.activeMode].label;
+  els.activeModePill.textContent = MODE_META[state.activeMode]?.label || MODE_META.general_chat.label;
 
   const conversation = currentConversation();
   if (conversation && persist && !state.readOnlyShare) {
@@ -421,16 +427,17 @@ function renderHistory() {
     const row = document.createElement("div");
     row.className = "history-row";
     row.role = "listitem";
+    const displayTitle = conversation.title || makeTitle(conversation.messages?.find(m => m.role === "user")?.content || "New chat");
     row.innerHTML = `
       <button class="history-item ${conversation.id === state.currentConversationId ? "active" : ""}" type="button">
-        <div class="history-title">${conversation.pinned ? "📌" : ""}<span>${escapeHtml(conversation.title)}</span></div>
-        <div class="history-meta">${MODE_META[conversation.mode]?.label || "General"} · ${formatDate(conversation.updated_at)}</div>
+        <div class="history-title">${conversation.pinned ? "📌" : ""}<span>${escapeHtml(displayTitle)}</span></div>
+        <div class="history-meta">${MODE_META[conversation.mode]?.label || "General Chat"} · ${formatDate(conversation.updated_at)}</div>
       </button>
       <button class="history-dots" type="button" aria-label="Conversation actions">•••</button>
     `;
     row.querySelector(".history-item").addEventListener("click", () => {
       state.currentConversationId = conversation.id;
-      selectMode(conversation.mode || "case_analysis", false);
+      selectMode(conversation.mode || "general_chat", false);
       renderAll();
       closeSidebarMobile();
     });
@@ -455,8 +462,8 @@ function renderCurrentConversation() {
     return;
   }
 
-  els.conversationTitle.textContent = conversation.title || "New clinical chat";
-  els.activeModePill.textContent = MODE_META[conversation.mode]?.label || MODE_META[state.activeMode].label;
+  els.conversationTitle.textContent = conversation.title || "New chat";
+  els.activeModePill.textContent = MODE_META[conversation.mode]?.label || MODE_META[state.activeMode]?.label || MODE_META.general_chat.label;
   if (!conversation.messages.length) {
     inner.appendChild(welcomeNode());
   } else {
@@ -478,8 +485,11 @@ function welcomeNode() {
     <div class="welcome-card">
       <div class="welcome-mark">Nx</div>
       <h2>How can I help?</h2>
-      <p>Choose a mode from the sidebar, attach case files if needed, and ask naturally. The active tool gently changes the workspace theme.</p>
+      <p>Start with General Chat, or choose a clinical tool from the sidebar. Attach case files if needed and ask naturally.</p>
       <div class="prompt-grid">
+        <button class="prompt-card" data-prompt="Explain the difference between ACE inhibitors and ARBs briefly.">
+          <strong>General Chat</strong><span>Normal chat without forcing a tool.</span>
+        </button>
         <button class="prompt-card" data-prompt="65-year-old male on ramipril + potassium supplement. No recent K or SCr. Analyze the risk.">
           <strong>Case Analysis</strong><span>Analyze a patient case with missing information.</span>
         </button>
@@ -589,7 +599,7 @@ async function sendMessage(event) {
   };
 
   conversation.messages.push(userMessage);
-  if (conversation.title === "New clinical chat") conversation.title = makeTitle(userContent);
+  if (isPlaceholderTitle(conversation.title)) conversation.title = makeTitle(userContent);
   conversation.mode = state.activeMode;
   conversation.updated_at = nowIso();
 
@@ -603,8 +613,19 @@ async function sendMessage(event) {
   await streamAssistantReply(conversation);
 }
 
+function isPlaceholderTitle(title = "") {
+  return !String(title).trim() || ["new clinical chat", "new chat", "untitled chat"].includes(String(title).trim().toLowerCase());
+}
+
 function makeTitle(text) {
-  return text.replace(/\s+/g, " ").slice(0, 44) || "Attached case";
+  const cleaned = String(text || "")
+    .replace(/\[[^\]]+\]/g, "")
+    .replace(/[\n\r]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned) return "Attached case";
+  const words = cleaned.split(" ").slice(0, 7).join(" ");
+  return words.replace(/[.,:;!?،؛؟]+$/g, "").slice(0, 58) || "New chat";
 }
 
 async function buildAttachmentPayloads(files) {
@@ -646,6 +667,7 @@ async function streamAssistantReply(conversation) {
   `;
 
   state.isGenerating = true;
+  document.body.classList.add("generating");
   state.abortController = new AbortController();
   els.stopBtn.classList.remove("hidden");
   els.sendBtn.disabled = true;
@@ -721,6 +743,7 @@ async function streamAssistantReply(conversation) {
   } finally {
     clearInterval(timer);
     state.isGenerating = false;
+    document.body.classList.remove("generating");
     state.abortController = null;
     els.stopBtn.classList.add("hidden");
     els.sendBtn.disabled = false;
@@ -791,8 +814,12 @@ function openConversationMenu(event, conversation) {
   const rect = event.currentTarget.getBoundingClientRect();
   const menu = document.createElement("div");
   menu.className = "dropdown";
-  menu.style.top = `${Math.min(rect.bottom + 6, window.innerHeight - 260)}px`;
-  menu.style.left = `${Math.min(rect.left - 156, window.innerWidth - 210)}px`;
+  const menuWidth = Math.min(220, window.innerWidth - 16);
+  const left = Math.max(8, Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 8));
+  const top = Math.max(8, Math.min(rect.bottom + 6, window.innerHeight - 300));
+  menu.style.width = `${menuWidth}px`;
+  menu.style.top = `${top}px`;
+  menu.style.left = `${left}px`;
   menu.innerHTML = `
     <button class="menu-btn" data-action="pin">${conversation.pinned ? "Unpin" : "Pin"}</button>
     <button class="menu-btn" data-action="rename">Rename</button>
@@ -849,7 +876,7 @@ async function shareConversation(conversation) {
         .insert({
           conversation_id: conversation.id,
           owner_id: state.user.id,
-          title: conversation.title,
+          title: conversation.title || makeTitle(conversation.messages?.find(m => m.role === "user")?.content || "Shared chat"),
           mode: conversation.mode,
           messages: conversation.messages
         })
@@ -896,43 +923,93 @@ async function loadSharedConversation(shareId) {
   });
   state.conversations = [conversation];
   state.currentConversationId = conversation.id;
-  state.activeMode = conversation.mode || "case_analysis";
+  state.activeMode = conversation.mode || "general_chat";
   selectMode(state.activeMode, false);
   await enterApp({ id: "shared_viewer", email: "Shared conversation", user_metadata: { full_name: "Shared" } }, { readOnlyShare: true });
   return true;
 }
 
-function exportConversationPdf(conversation = currentConversation()) {
+async function exportConversationPdf(conversation = currentConversation()) {
   if (!conversation) return;
-  const { jsPDF } = window.jspdf || {};
-  if (!jsPDF) return showToast("jsPDF not loaded");
 
-  const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const margin = 14;
-  let y = 18;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(15);
-  doc.text(conversation.title || "Nexus report", margin, y);
-  y += 8;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.text(`${MODE_META[conversation.mode]?.label || "Chat"} · ${new Date().toLocaleString()}`, margin, y);
-  y += 10;
+  const report = buildPdfReportNode(conversation);
+  document.body.appendChild(report);
 
-  const body = conversation.messages.map(msg => {
-    const role = msg.role === "assistant" ? "Nexus" : "User";
-    const files = msg.attachments?.length ? `\nAttachments: ${msg.attachments.map(f => f.name).join(", ")}` : "";
-    return `${role}:\n${msg.content}${files}`;
-  }).join("\n\n---\n\n");
+  const filename = `${safeFilename(conversation.title || makeTitle(conversation.messages?.find(m => m.role === "user")?.content || "nexus-chat"))}.pdf`;
 
-  const lines = doc.splitTextToSize(body, 180);
-  doc.setFontSize(10);
-  lines.forEach(line => {
-    if (y > 282) { doc.addPage(); y = 18; }
-    doc.text(line, margin, y);
-    y += 5.4;
+  try {
+    if (window.html2pdf) {
+      await window.html2pdf()
+        .set({
+          margin: [8, 8, 8, 8],
+          filename,
+          image: { type: "jpeg", quality: 0.98 },
+          html2canvas: {
+            scale: Math.min(2.2, window.devicePixelRatio || 2),
+            useCORS: true,
+            backgroundColor: getComputedStyle(document.body).getPropertyValue("--surface").trim() || "#ffffff"
+          },
+          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+          pagebreak: { mode: ["css", "legacy"], avoid: [".pdf-message", ".pdf-callout"] }
+        })
+        .from(report)
+        .save();
+      showToast("PDF exported cleanly");
+    } else {
+      const printWindow = window.open("", "_blank");
+      if (!printWindow) throw new Error("Popup blocked. Allow popups to print/export.");
+      printWindow.document.write(`<!doctype html><html><head><title>${escapeHtml(filename)}</title></head><body>${report.outerHTML}</body></html>`);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+    }
+  } catch (error) {
+    showToast(error.message || "PDF export failed");
+  } finally {
+    report.remove();
+  }
+}
+
+function buildPdfReportNode(conversation) {
+  const node = document.createElement("article");
+  node.className = "pdf-report";
+  node.dir = /[؀-ۿ]/.test(JSON.stringify(conversation.messages || [])) ? "auto" : "ltr";
+
+  const modeLabel = MODE_META[conversation.mode]?.label || "General Chat";
+  const title = conversation.title || makeTitle(conversation.messages?.find(m => m.role === "user")?.content || "Nexus report");
+  const generated = new Date().toLocaleString();
+
+  node.innerHTML = `
+    <header class="pdf-header">
+      <div class="pdf-brand">Nx</div>
+      <div>
+        <h1>${escapeHtml(title)}</h1>
+        <p>${escapeHtml(modeLabel)} · Generated ${escapeHtml(generated)}</p>
+      </div>
+    </header>
+    <section class="pdf-meta-box">
+      Educational clinical decision support only. Confirm critical decisions with trusted references and local protocols.
+    </section>
+    <main class="pdf-body"></main>
+  `;
+
+  const body = node.querySelector(".pdf-body");
+  (conversation.messages || []).forEach(message => {
+    const block = document.createElement("section");
+    block.className = `pdf-message ${message.role === "assistant" ? "assistant" : "user"}`;
+    const label = message.role === "assistant" ? "Nexus" : "User";
+    const attachments = message.attachments?.length
+      ? `<div class="pdf-attachments"><b>Attachments:</b> ${escapeHtml(message.attachments.map(f => f.name).join(", "))}</div>`
+      : "";
+    block.innerHTML = `
+      <div class="pdf-role">${label}</div>
+      <div class="pdf-content">${message.role === "assistant" ? renderMarkdown(message.content) : escapeHtml(message.content).replace(/\n/g, "<br>")}</div>
+      ${attachments}
+    `;
+    body.appendChild(block);
   });
-  doc.save(`${safeFilename(conversation.title || "nexus-chat")}.pdf`);
+
+  return node;
 }
 
 function safeFilename(name) {
