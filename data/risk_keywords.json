@@ -1,0 +1,11 @@
+{
+  "emergency": [
+    "unconscious", "seizure", "severe bleeding", "blood in stool", "black stool", "vomiting blood", "chest pain", "shortness of breath", "anaphylaxis", "swelling face", "fainted", "syncope", "no fetal movement", "reduced fetal movement", "نزيف شديد", "إغماء", "اغماء", "تشنج", "ضيق نفس", "ألم صدر", "حركة الجنين", "الجنين مش بيتحرك"
+  ],
+  "high": [
+    "warfarin", "insulin", "potassium", "kcl", "pregnant", "pregnancy", "renal", "kidney", "ckd", "egfr", "creatinine", "hyperkalemia", "bleeding", "inr", "حامل", "كلية", "كلى", "بوتاسيوم", "وارفارين", "انسولين", "إنسولين"
+  ],
+  "moderate": [
+    "elderly", "older", "diabetes", "hypertension", "heart failure", "diuretic", "nsaid", "bp", "ضغط", "سكر", "مدر", "مسكن"
+  ]
+}

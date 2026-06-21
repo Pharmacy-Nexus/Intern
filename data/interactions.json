@@ -1,0 +1,79 @@
+[
+  {
+    "id": "INT-ACEI-K-001",
+    "drugs": ["ramipril", "potassium chloride"],
+    "severity": "high",
+    "risk": "Hyperkalemia",
+    "mechanism": "ACE inhibitors reduce aldosterone-mediated potassium excretion; potassium supplementation adds exogenous potassium load.",
+    "recommendation": "Avoid routine potassium supplementation unless there is a clear indication and potassium/renal function are monitored.",
+    "monitoring": ["serum potassium", "serum creatinine", "eGFR", "ECG if symptomatic or severe hyperkalemia suspected"],
+    "patient_factor_amplifiers": ["CKD", "older age", "diabetes", "dehydration", "concurrent NSAID", "potassium-sparing diuretic"],
+    "source": "Local Interaction Rule: ACEI + potassium v1"
+  },
+  {
+    "id": "INT-ACEI-NSAID-001",
+    "drugs": ["ramipril", "diclofenac"],
+    "severity": "moderate_to_high",
+    "risk": "Acute kidney injury, reduced antihypertensive effect, possible hyperkalemia",
+    "mechanism": "NSAIDs constrict the afferent renal arteriole while ACE inhibitors dilate the efferent arteriole, reducing glomerular filtration pressure in susceptible patients.",
+    "recommendation": "Use the shortest NSAID duration if unavoidable, avoid in high-risk renal/dehydrated patients, and check renal function and potassium when clinically relevant.",
+    "monitoring": ["serum creatinine", "eGFR", "serum potassium", "blood pressure", "hydration status"],
+    "patient_factor_amplifiers": ["CKD", "dehydration", "heart failure", "older age", "diuretic use"],
+    "source": "Local Interaction Rule: ACEI + NSAID v1"
+  },
+  {
+    "id": "INT-TRIPLE-WHAMMY-001",
+    "drugs": ["ramipril", "diclofenac", "furosemide"],
+    "severity": "high",
+    "risk": "Triple-whammy acute kidney injury risk",
+    "mechanism": "ACE inhibitor/ARB + diuretic + NSAID can reduce renal perfusion and filtration through combined hemodynamic effects.",
+    "recommendation": "Avoid the combination when possible. If unavoidable, ensure hydration, baseline renal function/electrolytes, short NSAID duration, and follow-up labs.",
+    "monitoring": ["baseline and follow-up serum creatinine", "eGFR", "serum potassium", "blood pressure", "urine output"],
+    "patient_factor_amplifiers": ["CKD", "older age", "heart failure", "dehydration", "diabetes"],
+    "source": "Local Clinical Rule: Triple whammy v1"
+  },
+  {
+    "id": "INT-WARF-AMIO-001",
+    "drugs": ["warfarin", "amiodarone"],
+    "severity": "high",
+    "risk": "Increased INR and bleeding risk",
+    "mechanism": "Amiodarone inhibits warfarin metabolism, increasing anticoagulant effect.",
+    "recommendation": "Requires close INR monitoring and prescriber-led warfarin dose adjustment. Counsel for bleeding symptoms.",
+    "monitoring": ["INR", "bleeding/bruising", "hemoglobin if bleeding suspected"],
+    "patient_factor_amplifiers": ["older age", "liver disease", "history of bleeding", "concurrent antiplatelet/NSAID"],
+    "source": "Local Interaction Rule: warfarin + amiodarone v1"
+  },
+  {
+    "id": "INT-ALF-SILD-001",
+    "drugs": ["alfuzosin", "sildenafil"],
+    "severity": "moderate_to_high",
+    "risk": "Symptomatic hypotension, dizziness, syncope, falls",
+    "mechanism": "Alpha-1 blockade and PDE5 inhibition both lower vascular tone and can have additive blood-pressure lowering effects.",
+    "recommendation": "Avoid unsafe self-combination. If prescribed together, use cautious timing/dosing and counsel about dizziness, syncope, and standing slowly.",
+    "monitoring": ["blood pressure symptoms", "dizziness/syncope", "fall risk", "concurrent antihypertensives"],
+    "patient_factor_amplifiers": ["older age", "baseline hypotension", "multiple antihypertensives", "dehydration"],
+    "source": "Local Interaction Rule: alpha-blocker + PDE5 inhibitor v1"
+  },
+  {
+    "id": "INT-ARB-K-001",
+    "drugs": ["losartan", "potassium chloride"],
+    "severity": "high",
+    "risk": "Hyperkalemia",
+    "mechanism": "ARBs reduce aldosterone-mediated potassium excretion; potassium supplements increase potassium load.",
+    "recommendation": "Avoid routine potassium supplementation unless indicated and monitored.",
+    "monitoring": ["serum potassium", "serum creatinine", "eGFR"],
+    "patient_factor_amplifiers": ["CKD", "older age", "diabetes", "dehydration", "NSAID use"],
+    "source": "Local Interaction Rule: ARB + potassium v1"
+  },
+  {
+    "id": "INT-WARF-ASP-001",
+    "drugs": ["warfarin", "aspirin"],
+    "severity": "high",
+    "risk": "Bleeding risk due to combined anticoagulant and antiplatelet effect",
+    "mechanism": "Warfarin anticoagulation plus aspirin platelet inhibition increases bleeding risk.",
+    "recommendation": "Only combine when there is a clear prescriber-approved indication. Counsel for bleeding and monitor closely.",
+    "monitoring": ["bleeding/bruising", "INR", "GI bleeding symptoms"],
+    "patient_factor_amplifiers": ["history of ulcer", "older age", "NSAID use", "liver disease"],
+    "source": "Local Interaction Rule: warfarin + aspirin v1"
+  }
+]

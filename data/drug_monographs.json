@@ -1,0 +1,98 @@
+{
+  "ramipril": {
+    "generic": "ramipril",
+    "class": "ACE inhibitor",
+    "core_uses": ["hypertension", "heart failure", "cardiovascular risk reduction when indicated"],
+    "key_warnings": ["hyperkalemia", "renal function deterioration", "angioedema", "hypotension", "avoid in pregnancy"],
+    "monitoring": ["blood pressure", "serum potassium", "serum creatinine/eGFR after initiation or dose changes"],
+    "source": "Local Drug Monograph: ramipril v1"
+  },
+  "potassium chloride": {
+    "generic": "potassium chloride",
+    "class": "electrolyte supplement",
+    "core_uses": ["treatment or prevention of hypokalemia when clinically indicated"],
+    "key_warnings": ["hyperkalemia", "GI irritation", "higher risk with ACE inhibitors, ARBs, potassium-sparing diuretics, CKD"],
+    "monitoring": ["serum potassium", "renal function", "ECG if severe electrolyte abnormality suspected"],
+    "source": "Local Drug Monograph: potassium chloride v1"
+  },
+  "diclofenac": {
+    "generic": "diclofenac",
+    "class": "NSAID",
+    "core_uses": ["pain", "inflammation"],
+    "key_warnings": ["GI bleeding", "kidney injury", "fluid retention", "blood pressure elevation", "cardiovascular risk"],
+    "monitoring": ["renal function in at-risk patients", "blood pressure", "GI bleeding symptoms"],
+    "source": "Local Drug Monograph: diclofenac v1"
+  },
+  "furosemide": {
+    "generic": "furosemide",
+    "class": "loop diuretic",
+    "core_uses": ["edema", "heart failure congestion", "hypertension in selected patients"],
+    "key_warnings": ["dehydration", "hypokalemia", "hypotension", "renal function changes"],
+    "monitoring": ["weight/edema", "blood pressure", "serum electrolytes", "renal function"],
+    "source": "Local Drug Monograph: furosemide v1"
+  },
+  "warfarin": {
+    "generic": "warfarin",
+    "class": "vitamin K antagonist anticoagulant",
+    "core_uses": ["thromboembolism prevention/treatment where indicated"],
+    "key_warnings": ["major bleeding", "many drug/food interactions", "teratogenic risk", "requires INR monitoring"],
+    "monitoring": ["INR", "bleeding/bruising", "hemoglobin if bleeding suspected"],
+    "source": "Local Drug Monograph: warfarin v1"
+  },
+  "amiodarone": {
+    "generic": "amiodarone",
+    "class": "antiarrhythmic",
+    "core_uses": ["rhythm control in selected arrhythmias"],
+    "key_warnings": ["thyroid toxicity", "pulmonary toxicity", "liver toxicity", "QT prolongation", "warfarin interaction"],
+    "monitoring": ["ECG", "thyroid function", "liver function", "pulmonary symptoms", "INR if on warfarin"],
+    "source": "Local Drug Monograph: amiodarone v1"
+  },
+  "metformin": {
+    "generic": "metformin",
+    "class": "biguanide antidiabetic",
+    "core_uses": ["type 2 diabetes"],
+    "key_warnings": ["lactic acidosis risk in severe renal impairment or acute illness", "GI intolerance", "B12 deficiency with long-term use"],
+    "monitoring": ["eGFR", "glucose/HbA1c", "B12 if long-term or symptomatic"],
+    "source": "Local Drug Monograph: metformin v1"
+  },
+  "insulin": {
+    "generic": "insulin",
+    "class": "antidiabetic hormone therapy",
+    "core_uses": ["diabetes requiring insulin therapy", "hyperglycemia management"],
+    "key_warnings": ["hypoglycemia", "dose stacking", "administration errors", "requires glucose monitoring"],
+    "monitoring": ["blood glucose", "hypoglycemia symptoms", "meal timing", "injection technique"],
+    "source": "Local Drug Monograph: insulin v1"
+  },
+  "alfuzosin": {
+    "generic": "alfuzosin",
+    "class": "alpha-1 blocker",
+    "core_uses": ["benign prostatic hyperplasia symptoms"],
+    "key_warnings": ["orthostatic hypotension", "syncope", "additive hypotension with PDE5 inhibitors or antihypertensives"],
+    "monitoring": ["blood pressure", "dizziness/syncope", "fall risk"],
+    "source": "Local Drug Monograph: alfuzosin v1"
+  },
+  "sildenafil": {
+    "generic": "sildenafil",
+    "class": "PDE5 inhibitor",
+    "core_uses": ["erectile dysfunction", "pulmonary arterial hypertension under specialist use"],
+    "key_warnings": ["contraindicated with nitrates", "hypotension risk with alpha-blockers", "visual/hearing symptoms need urgent review"],
+    "monitoring": ["blood pressure symptoms", "concurrent nitrate or alpha-blocker use"],
+    "source": "Local Drug Monograph: sildenafil v1"
+  },
+  "losartan": {
+    "generic": "losartan",
+    "class": "angiotensin receptor blocker (ARB)",
+    "core_uses": ["hypertension", "renal protection in selected diabetic kidney disease", "heart failure in selected patients"],
+    "key_warnings": ["hyperkalemia", "renal function deterioration", "avoid in pregnancy"],
+    "monitoring": ["blood pressure", "serum potassium", "serum creatinine/eGFR"],
+    "source": "Local Drug Monograph: losartan v1"
+  },
+  "aspirin": {
+    "generic": "aspirin",
+    "class": "antiplatelet / NSAID at analgesic doses",
+    "core_uses": ["secondary cardiovascular prevention when indicated", "pain/fever at non-antiplatelet doses"],
+    "key_warnings": ["GI bleeding", "bleeding risk with anticoagulants", "hypersensitivity", "avoid in children with viral illness"],
+    "monitoring": ["bleeding symptoms", "GI symptoms", "concurrent anticoagulants/NSAIDs"],
+    "source": "Local Drug Monograph: aspirin v1"
+  }
+}

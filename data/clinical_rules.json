@@ -1,0 +1,52 @@
+[
+  {
+    "id": "RULE-ACEI-RENAL-K-001",
+    "name": "ACE inhibitor/ARB potassium and renal monitoring",
+    "trigger_drug_classes": ["ACE inhibitor", "angiotensin receptor blocker (ARB)"],
+    "trigger_terms": ["potassium", "kcl", "renal", "kidney", "creatinine", "egfr", "ckd"],
+    "risk": "Hyperkalemia and renal function deterioration can be missed if K+ and renal function are unknown.",
+    "required_info": ["serum potassium", "serum creatinine", "eGFR", "recent dose changes", "NSAID or potassium-sparing diuretic use"],
+    "safety_action": "Do not reassure that potassium supplementation is safe with ACEI/ARB unless labs and indication are known.",
+    "source": "Local Safety Rule: ACEI/ARB monitoring v1"
+  },
+  {
+    "id": "RULE-NSAID-RENAL-001",
+    "name": "NSAID renal-risk screen",
+    "trigger_drug_classes": ["NSAID"],
+    "trigger_terms": ["renal", "kidney", "ckd", "dehydration", "diuretic", "ace", "arb", "heart failure"],
+    "risk": "NSAIDs can precipitate AKI and worsen blood pressure/heart failure in susceptible patients.",
+    "required_info": ["renal function", "hydration status", "heart failure status", "concurrent ACEI/ARB/diuretic"],
+    "safety_action": "Prefer non-NSAID options or short supervised use in renal/cardiovascular high-risk patients.",
+    "source": "Local Safety Rule: NSAID renal screen v1"
+  },
+  {
+    "id": "RULE-WARFARIN-BLEEDING-001",
+    "name": "Warfarin bleeding-risk screen",
+    "trigger_drug_classes": ["vitamin K antagonist anticoagulant"],
+    "trigger_terms": ["bleeding", "bruise", "inr", "amiodarone", "aspirin", "nsaid", "blood"],
+    "risk": "Warfarin has high harm potential when interacting drugs or bleeding symptoms are present.",
+    "required_info": ["current INR", "bleeding symptoms", "warfarin dose", "new interacting medicines", "liver disease history"],
+    "safety_action": "Bleeding symptoms or very high INR require urgent clinician assessment; do not advise self-adjustment without prescriber guidance.",
+    "source": "Local Safety Rule: warfarin bleeding screen v1"
+  },
+  {
+    "id": "RULE-INSULIN-HYPO-001",
+    "name": "Insulin hypoglycemia and dose stacking screen",
+    "trigger_drug_classes": ["antidiabetic hormone therapy"],
+    "trigger_terms": ["hypoglycemia", "low sugar", "sweating", "shaking", "dose", "units", "stacking", "glucose"],
+    "risk": "Insulin dose errors and dose stacking can cause severe hypoglycemia.",
+    "required_info": ["blood glucose reading", "insulin type", "dose timing", "last meal", "symptoms", "renal function if relevant"],
+    "safety_action": "If severe hypoglycemia, unconsciousness, seizure, or inability to take oral glucose occurs, urgent emergency care is required.",
+    "source": "Local Safety Rule: insulin hypoglycemia v1"
+  },
+  {
+    "id": "RULE-PREGNANCY-RED-FLAG-001",
+    "name": "Pregnancy red-flag screen",
+    "trigger_drug_classes": [],
+    "trigger_terms": ["pregnant", "pregnancy", "حامل", "حمل", "جنين", "fetal", "movement"],
+    "risk": "Pregnancy questions may involve maternal/fetal safety and need conservative triage.",
+    "required_info": ["gestational age", "symptoms", "fetal movement status", "current medicines", "obstetrician advice"],
+    "safety_action": "Reduced fetal movement, bleeding, severe abdominal pain, severe headache/visual symptoms, or severe hypertension need urgent obstetric assessment.",
+    "source": "Local Safety Rule: pregnancy red flags v1"
+  }
+]
