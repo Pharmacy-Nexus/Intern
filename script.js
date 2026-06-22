@@ -557,12 +557,28 @@ function createMessageNode(role, content, options = {}) {
 
 function renderMarkdown(text = "") {
   let source = String(text || "");
-  source = source.replace(/^>\s*\[!(INFO|WARNING|IMPORTANT|TIP|NOTE)\]\s*/gim, "> **$1** — ");
+  source = normalizeClinicalCallouts(source);
   if (window.marked && window.DOMPurify) {
     const html = window.marked.parse(source, { breaks: true, gfm: true });
-    return window.DOMPurify.sanitize(html);
+    return window.DOMPurify.sanitize(html, {
+      ADD_TAGS: ["div", "span"],
+      ADD_ATTR: ["class"]
+    });
   }
   return escapeHtml(source).replace(/\n/g, "<br>");
+}
+
+function normalizeClinicalCallouts(source = "") {
+  const make = (type, body) => {
+    const cleanType = String(type || "INFO").toUpperCase();
+    const cleanBody = escapeHtml(String(body || "").trim());
+    return `<div class="callout callout-${cleanType.toLowerCase()}"><strong>${cleanType}</strong><span>${cleanBody}</span></div>`;
+  };
+
+  return String(source)
+    .replace(/^>\s*\[!(INFO|WARNING|IMPORTANT|TIP|NOTE)\]\s*(.*)$/gim, (_, type, body) => make(type, body))
+    .replace(/^\[!(INFO|WARNING|IMPORTANT|TIP|NOTE)\]\s*(.*)$/gim, (_, type, body) => make(type, body))
+    .replace(/^(WARNING|IMPORTANT|INFO|NOTE|TIP)\s*[—-]\s*(.*)$/gim, (_, type, body) => make(type, body));
 }
 
 function scrollToBottom() {
