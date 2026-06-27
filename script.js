@@ -123,6 +123,15 @@ function getLocalJson(key, fallback) {
 function setLocalJson(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
 }
+function isShortGreetingText(text = "") {
+  const t = String(text || "").trim().toLowerCase();
+  return /^(hi|hello|hey|السلام عليكم|اهلا|أهلا|ازيك|عامل ايه|هاي|هلا|صباح الخير|مساء الخير)[!.؟\s]*$/.test(t);
+}
+
+function localGreetingReply() {
+  return "Hi 👋 I’m Nexus. How can I help?";
+}
+
 
 function normalizeConversation(row) {
   return {
@@ -500,6 +509,9 @@ function renderCurrentConversation() {
         mode: message.mode,
         thinkingTime: message.thinkingTime,
         attachments: message.attachments || [],
+        hideSuggestions: message.hideSuggestions,
+        hideDisclaimer: message.hideDisclaimer,
+        local: message.local,
         index
       }));
     });
@@ -599,7 +611,7 @@ function createMessageNode(role, content, options = {}) {
     actions.appendChild(editBtn);
   }
 
-  if (role === "assistant") {
+  if (role === "assistant" && !options.hideDisclaimer && options.mode !== "general_chat") {
     const disclaimer = document.createElement("div");
     disclaimer.className = "disclaimer";
     disclaimer.textContent = "Educational clinical decision support only. Confirm critical decisions with trusted references and local protocols.";
@@ -630,6 +642,11 @@ function startEditMessage(index) {
   els.messageInput.focus();
   document.body.classList.add("editing-message");
   showToast("Editing message — send to regenerate from here");
+}
+
+function isGreetingLikeAssistantContent(text = "") {
+  const t = String(text || "").trim().toLowerCase();
+  return t.length < 90 && /^(hi|hello|hey|hi there|أهلاً|اهلا|مرحب)/i.test(t);
 }
 
 function extractRelatedQuestions(text = "") {
@@ -700,6 +717,20 @@ function buildFallbackRelatedQuestions(text = "") {
       "Explain how to monitor potassium and renal function with ACE inhibitors.",
       "When is potassium supplementation appropriate with ramipril?",
       "Which medicines increase hyperkalemia risk with ACE inhibitors?"
+    ];
+  }
+  if (/metformin|egfr|lactic acidosis|لاكتك|لاكتيك/.test(t)) {
+    return [
+      "What diabetes alternatives are safer when eGFR is below 30?",
+      "What symptoms suggest metformin-associated lactic acidosis?",
+      "How should glucose be monitored after stopping or holding metformin?"
+    ];
+  }
+  if (/active ingredient|excipient|سواغ|مادة فعالة|مادة اضافية|مادة إضافية|formulation|تصنيع/.test(t)) {
+    return [
+      "Give examples of common excipients and their functions.",
+      "Explain how excipients can affect drug absorption or tolerability.",
+      "Compare generic and brand medicines from a formulation perspective."
     ];
   }
   if (/triple whammy|diclofenac|furosemide|aki|renal|kidney/.test(t)) {
@@ -889,6 +920,27 @@ async function sendMessage(event) {
   autoGrow(els.messageInput);
   state.pendingFiles = [];
   renderFileChips();
+
+  if (state.activeMode === "general_chat" && !attachments.length && isShortGreetingText(userContent)) {
+    const assistantMessage = {
+      role: "assistant",
+      content: localGreetingReply(),
+      mode: "general_chat",
+      created_at: nowIso(),
+      thinkingTime: 0,
+      hideSuggestions: true,
+      hideDisclaimer: true,
+      local: true
+    };
+    conversation.messages.push(assistantMessage);
+    conversation.mode = "general_chat";
+    conversation.updated_at = nowIso();
+    renderCurrentConversation();
+    await persistConversation(conversation, conversation);
+    els.messageInput.focus();
+    return;
+  }
+
   renderCurrentConversation();
   await persistConversation(conversation, conversation);
 

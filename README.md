@@ -57,3 +57,15 @@ Drug Reverse
 
 After replacing files, redeploy on Vercel and hard-refresh the browser.
 Do not open `index.html` directly from disk because `/api/chat` requires Vercel or `vercel dev`.
+
+## v4.7.1 notes
+
+This patch keeps v4.7's sidebar/mode layout and fixes the behavior seen during testing:
+
+- Short greetings such as `Hi` are handled locally in General Chat without calling the AI.
+- Greetings do not show thinking time, suggested questions, or the clinical disclaimer.
+- General Chat stays lightweight for general pharmacy concepts such as active ingredient, excipient, formulation, manufacturing, herbs, and pharmacology basics.
+- General knowledge questions skip the AI parser to reduce latency.
+- Related questions are more topic-aware, including specific follow-ups for excipients/formulation and metformin with low eGFR.
+- The clinical disclaimer is hidden for General Chat answers and kept for Interaction/Case/Reverse outputs.
+- Case recommendations use safer wording around medication changes instead of direct stop/start commands unless urgent.
