@@ -55,7 +55,7 @@ const els = {
   activeModePill: document.getElementById("activeModePill"),
   conversationTitle: document.getElementById("conversationTitle"),
   messages: document.getElementById("messages"),
-  messagesInner: document.getElementById("messagesInner"),
+  messageRail: document.getElementById("messageRail"),
   chatForm: document.getElementById("chatForm"),
   messageInput: document.getElementById("messageInput"),
   sendBtn: document.getElementById("sendBtn"),
@@ -65,10 +65,7 @@ const els = {
   attachedFiles: document.getElementById("attachedFiles"),
   newChatTopBtn: document.getElementById("newChatTopBtn"),
   modeSwitcher: document.getElementById("modeSwitcher"),
-  toast: document.getElementById("toast"),
-  safetyPanel: document.getElementById("safetyPanel"),
-  safetyContent: document.getElementById("safetyContent"),
-  closeSafetyPanel: document.getElementById("closeSafetyPanel")
+  toast: document.getElementById("toast")
 };
 
 let state = {
@@ -104,14 +101,14 @@ function escapeHtml(text = "") {
 
 function showToast(message) {
   els.toast.textContent = message;
-  els.toast.classList.add("show");
+  els.toast.classList.remove("hidden");
   clearTimeout(showToast.timer);
-  showToast.timer = setTimeout(() => els.toast.classList.remove("show"), 2500);
+  showToast.timer = setTimeout(() => els.toast.classList.add("hidden"), 2500);
 }
 
 function setAuthMessage(message, isError = false) {
   els.authMessage.textContent = message || "";
-  els.authMessage.style.color = isError ? "var(--danger)" : "var(--text-tertiary)";
+  els.authMessage.style.color = isError ? "var(--danger)" : "var(--muted)";
 }
 
 function localUserKey() { return "nexus_local_user"; }
@@ -126,15 +123,15 @@ function getLocalJson(key, fallback) {
 function setLocalJson(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
 }
-
 function isShortGreetingText(text = "") {
   const t = String(text || "").trim().toLowerCase();
   return /^(hi|hello|hey|السلام عليكم|اهلا|أهلا|ازيك|عامل ايه|هاي|هلا|صباح الخير|مساء الخير)[!.؟\s]*$/.test(t);
 }
 
 function localGreetingReply() {
-  return "Hi 👋 I'm Nexus. How can I help?";
+  return "Hi 👋 I’m Nexus. How can I help?";
 }
+
 
 function normalizeConversation(row) {
   return {
@@ -402,7 +399,7 @@ async function deleteConversation(conversation) {
 function selectMode(mode, persist = true) {
   state.activeMode = MODE_META[mode] ? mode : "general_chat";
   document.body.dataset.mode = state.activeMode;
-  document.querySelectorAll(".mode-chip").forEach(btn => {
+  document.querySelectorAll(".mode-btn, .mode-chip-btn").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.mode === state.activeMode);
   });
   els.activeModePill.textContent = MODE_META[state.activeMode]?.label || MODE_META.general_chat.label;
@@ -418,6 +415,7 @@ function applyTheme(theme) {
   document.body.dataset.theme = safeTheme;
   localStorage.setItem("nexus_theme", safeTheme);
   els.themeIcon.textContent = safeTheme === "dark" ? "☀" : "☾";
+  els.themeToggleBtn.querySelector("span:last-child").textContent = safeTheme === "dark" ? "Light mode" : "Dark mode";
 }
 
 function renderAll() {
@@ -428,6 +426,7 @@ function renderAll() {
 function renderHistory() {
   els.chatHistory.innerHTML = "";
   els.toggleArchiveBtn.classList.toggle("active", state.showArchived);
+  els.toggleArchiveBtn.textContent = state.showArchived ? "Active" : "Archive";
 
   if (state.readOnlyShare) {
     els.chatHistory.innerHTML = `<div class="empty-state">Shared read-only conversation.</div>`;
@@ -441,18 +440,19 @@ function renderHistory() {
 
   const groups = groupConversationsByDate(state.conversations);
   for (const [label, items] of groups) {
-    const groupNode = document.createElement("div");
+    const groupNode = document.createElement("section");
     groupNode.className = "history-group";
     groupNode.innerHTML = `<div class="history-group-title">${escapeHtml(label)}</div>`;
     items.forEach(conversation => {
       const row = document.createElement("div");
-      row.className = "history-item-wrapper";
+      row.className = "history-row compact";
+      row.role = "listitem";
       const displayTitle = conversation.title || makeTitle(conversation.messages?.find(m => m.role === "user")?.content || "New chat");
       row.innerHTML = `
         <button class="history-item ${conversation.id === state.currentConversationId ? "active" : ""}" type="button" title="${escapeHtml(displayTitle)}">
-          <span class="history-item-title">${conversation.pinned ? "📌 " : ""}${escapeHtml(displayTitle)}</span>
+          <span class="history-title-text">${conversation.pinned ? "📌 " : ""}${escapeHtml(displayTitle)}</span>
         </button>
-        <button class="history-actions" type="button" aria-label="Conversation actions">•••</button>
+        <button class="history-dots" type="button" aria-label="Conversation actions">•••</button>
       `;
       row.querySelector(".history-item").addEventListener("click", () => {
         state.currentConversationId = conversation.id;
@@ -460,7 +460,7 @@ function renderHistory() {
         renderAll();
         closeSidebarMobile();
       });
-      row.querySelector(".history-actions").addEventListener("click", (event) => openConversationMenu(event, conversation));
+      row.querySelector(".history-dots").addEventListener("click", (event) => openConversationMenu(event, conversation));
       groupNode.appendChild(row);
     });
     els.chatHistory.appendChild(groupNode);
@@ -481,23 +481,31 @@ function groupConversationsByDate(conversations = []) {
   return Array.from(buckets.entries()).filter(([, items]) => items.length);
 }
 
+function formatDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "now";
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
 function renderCurrentConversation() {
   const conversation = currentConversation();
-  els.messagesInner.innerHTML = "";
+  els.messages.innerHTML = `<div class="messages-inner" id="messagesInner"></div>`;
+  const inner = document.getElementById("messagesInner");
 
   if (!conversation) {
-    els.messagesInner.appendChild(welcomeNode());
+    inner.appendChild(welcomeNode());
+    renderMessageRail();
     return;
   }
 
   els.conversationTitle.textContent = conversation.title || "New chat";
   els.activeModePill.textContent = MODE_META[conversation.mode]?.label || MODE_META[state.activeMode]?.label || MODE_META.general_chat.label;
-
   if (!conversation.messages.length) {
-    els.messagesInner.appendChild(welcomeNode());
+    inner.appendChild(welcomeNode());
+    renderMessageRail();
   } else {
     conversation.messages.forEach((message, index) => {
-      els.messagesInner.appendChild(createMessageNode(message.role, message.content, {
+      inner.appendChild(createMessageNode(message.role, message.content, {
         mode: message.mode,
         thinkingTime: message.thinkingTime,
         attachments: message.attachments || [],
@@ -508,41 +516,32 @@ function renderCurrentConversation() {
       }));
     });
   }
-
-  scrollToBottom(true);
+  renderMessageRail();
+  scrollToBottom();
 }
 
 function welcomeNode() {
   const node = document.createElement("div");
-  node.className = "welcome-screen";
+  node.className = "welcome";
   node.innerHTML = `
-    <div class="welcome-icon">Nx</div>
-    <h2 class="welcome-title">How can I help today?</h2>
-    <p class="welcome-subtitle">
-      Analyze cases, check drug interactions, or train with reverse scenarios. 
-      All responses include clinical safety context.
-    </p>
-    <div class="welcome-prompts">
-      <button class="prompt-card" data-prompt="65-year-old male on ramipril + potassium supplement. No recent K or SCr. Analyze the risk.">
-        <div class="prompt-card-icon">📋</div>
-        <div class="prompt-card-title">Case Analysis</div>
-        <div class="prompt-card-desc">Analyze a patient case with missing information and red flags.</div>
-      </button>
-      <button class="prompt-card" data-prompt="Check interaction: warfarin with amiodarone. Include mechanism, monitoring, and action plan.">
-        <div class="prompt-card-icon">⚡</div>
-        <div class="prompt-card-title">Drug Interaction</div>
-        <div class="prompt-card-desc">Safety check with severity, mechanism, and monitoring.</div>
-      </button>
-      <button class="prompt-card" data-prompt="Explain the difference between ACE inhibitors and ARBs briefly.">
-        <div class="prompt-card-icon">💬</div>
-        <div class="prompt-card-title">General Chat</div>
-        <div class="prompt-card-desc">Normal clinical chat without forcing a tool.</div>
-      </button>
-      <button class="prompt-card" data-prompt="Start Drug Reverse training for ACE inhibitors and hyperkalemia risk.">
-        <div class="prompt-card-icon">🎯</div>
-        <div class="prompt-card-title">Drug Reverse</div>
-        <div class="prompt-card-desc">Interactive training with clues and step-by-step correction.</div>
-      </button>
+    <div class="welcome-card">
+      <div class="welcome-mark">Nx</div>
+      <h2>How can I help?</h2>
+      <p>Start with General Chat, or choose a clinical tool from the sidebar. Attach case files if needed and ask naturally.</p>
+      <div class="prompt-grid">
+        <button class="prompt-card" data-prompt="Explain the difference between ACE inhibitors and ARBs briefly.">
+          <strong>General Chat</strong><span>Normal chat without forcing a tool.</span>
+        </button>
+        <button class="prompt-card" data-prompt="65-year-old male on ramipril + potassium supplement. No recent K or SCr. Analyze the risk.">
+          <strong>Case Analysis</strong><span>Analyze a patient case with missing information.</span>
+        </button>
+        <button class="prompt-card" data-prompt="Check interaction: warfarin with amiodarone. Include mechanism, monitoring, and action plan.">
+          <strong>Drug Interaction</strong><span>Safety check with severity and monitoring.</span>
+        </button>
+        <button class="prompt-card" data-prompt="Start Drug Reverse training for ACE inhibitors and hyperkalemia risk.">
+          <strong>Drug Reverse</strong><span>Interactive training with clues and correction.</span>
+        </button>
+      </div>
     </div>
   `;
   node.querySelectorAll("[data-prompt]").forEach(btn => {
@@ -560,75 +559,47 @@ function createMessageNode(role, content, options = {}) {
   row.className = `message-row ${role}`;
   if (Number.isInteger(options.index)) row.dataset.messageIndex = String(options.index);
 
-  const avatar = document.createElement("div");
-  avatar.className = "message-avatar";
-  avatar.textContent = role === "assistant" ? "Nx" : "You";
+  const meta = document.createElement("div");
+  meta.className = "message-meta";
+  meta.innerHTML = `<span class="message-avatar">${role === "assistant" ? "Nx" : "You"}</span><span>${role === "assistant" ? "Nexus" : "You"}</span>`;
 
-  const wrapper = document.createElement("div");
-  wrapper.className = "message-content-wrapper";
+  const body = document.createElement("div");
+  body.className = "message-content";
 
-  const bubble = document.createElement("div");
-  bubble.className = "message-bubble";
-
+  const related = role === "assistant" && !options.hideSuggestions ? ensureRelatedQuestions(content) : [];
   const cleanContent = role === "assistant" ? cleanAssistantVisibleContent(content) : content;
-  bubble.innerHTML = role === "assistant" 
-    ? renderMarkdown(cleanContent) 
-    : escapeHtml(content).replace(/\n/g, "<br>");
+  body.innerHTML = role === "assistant" ? renderMarkdown(cleanContent) : escapeHtml(content).replace(/\n/g, "<br>");
 
   if (options.attachments?.length && role === "user") {
-    const chips = document.createElement("div");
-    chips.className = "attachment-chips";
+    const files = document.createElement("div");
+    files.className = "attached-files";
     options.attachments.forEach(file => {
       const chip = document.createElement("span");
-      chip.className = "attachment-chip";
+      chip.className = "file-chip";
       chip.textContent = `📎 ${file.name}`;
-      chips.appendChild(chip);
+      files.appendChild(chip);
     });
-    bubble.appendChild(chips);
+    body.appendChild(files);
   }
 
-  if (role === "assistant") {
-    const related = ensureRelatedQuestions(content);
-    if (related.length) {
-      const rq = document.createElement("div");
-      rq.className = "related-questions";
-      rq.innerHTML = `<div class="related-title">Suggested follow-ups</div>`;
-      const chips = document.createElement("div");
-      chips.className = "related-chips";
-      related.forEach(q => {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "related-chip";
-        btn.textContent = q;
-        btn.addEventListener("click", () => {
-          els.messageInput.value = q;
-          autoGrow(els.messageInput);
-          els.messageInput.focus();
-        });
-        chips.appendChild(btn);
-      });
-      rq.appendChild(chips);
-      bubble.appendChild(rq);
-    }
-
-    if (!options.hideDisclaimer && options.mode !== "general_chat") {
-      const disc = document.createElement("div");
-      disc.className = "message-disclaimer";
-      disc.textContent = "Educational clinical decision support only. Verify with trusted references and local protocols.";
-      bubble.appendChild(disc);
-    }
+  if (role === "assistant" && related.length) {
+    body.appendChild(createRelatedQuestionsNode(related));
   }
 
-  wrapper.appendChild(bubble);
+  if (role === "assistant" && options.thinkingTime) {
+    const thinking = document.createElement("div");
+    thinking.className = "thinking-time";
+    thinking.textContent = `Thinking time: ${options.thinkingTime.toFixed(1)}s`;
+    body.prepend(thinking);
+  }
 
   const actions = document.createElement("div");
   actions.className = "message-actions";
-
   const copyBtn = document.createElement("button");
   copyBtn.type = "button";
   copyBtn.className = "message-action-btn";
   copyBtn.textContent = "Copy";
-  copyBtn.addEventListener("click", () => copyMessageText(cleanContent));
+  copyBtn.addEventListener("click", () => copyMessageText(role === "assistant" ? (row.querySelector(".message-content")?.innerText || cleanContent) : cleanContent));
   actions.appendChild(copyBtn);
 
   if (role === "user" && Number.isInteger(options.index) && !state.readOnlyShare) {
@@ -640,10 +611,16 @@ function createMessageNode(role, content, options = {}) {
     actions.appendChild(editBtn);
   }
 
-  wrapper.appendChild(actions);
+  if (role === "assistant" && !options.hideDisclaimer && options.mode !== "general_chat") {
+    const disclaimer = document.createElement("div");
+    disclaimer.className = "disclaimer";
+    disclaimer.textContent = "Educational clinical decision support only. Confirm critical decisions with trusted references and local protocols.";
+    body.appendChild(disclaimer);
+  }
 
-  row.appendChild(avatar);
-  row.appendChild(wrapper);
+  row.appendChild(meta);
+  row.appendChild(body);
+  row.appendChild(actions);
   return row;
 }
 
@@ -667,6 +644,11 @@ function startEditMessage(index) {
   showToast("Editing message — send to regenerate from here");
 }
 
+function isGreetingLikeAssistantContent(text = "") {
+  const t = String(text || "").trim().toLowerCase();
+  return t.length < 90 && /^(hi|hello|hey|hi there|أهلاً|اهلا|مرحب)/i.test(t);
+}
+
 function extractRelatedQuestions(text = "") {
   const source = String(text || "");
   const match = source.match(/(?:^|\n)#{0,3}\s*(?:Related questions|Follow-up questions|Suggested questions|أسئلة مقترحة|أسئلة متابعة)\s*:?\s*\n([\s\S]*)$/i);
@@ -683,12 +665,13 @@ function stripRelatedQuestions(text = "") {
   return String(text || "").replace(/(?:^|\n)#{0,3}\s*(?:Related questions|Follow-up questions|Suggested questions|أسئلة مقترحة|أسئلة متابعة)\s*:?\s*\n[\s\S]*$/i, "").trim();
 }
 
+
 function stripGenericClosers(text = "") {
   let source = String(text || "").trim();
   const closerPatterns = [
-    /\n+\s*(?:Do you have|Could you share|Can you share|Would you like|Need more detail|If you want)[^\n?؟]*(?:?|؟)?\s*$/i,
-    /\n+\s*(?:هل لديك|هل عندك|هل تحتاج|تحب|لو عايز|ممكن تبعت)[^\n?؟]*(?:?|؟)?\s*$/i,
-    /\n+\s*(?:Do you want me to|Can I help with anything else)[^\n?؟]*(?:?|؟)?\s*$/i
+    /\n+\s*(?:Do you have|Could you share|Can you share|Would you like|Need more detail|If you want)[^\n?؟]*(?:\?|\؟)?\s*$/i,
+    /\n+\s*(?:هل لديك|هل عندك|هل تحتاج|تحب|لو عايز|ممكن تبعت)[^\n?؟]*(?:\?|\؟)?\s*$/i,
+    /\n+\s*(?:Do you want me to|Can I help with anything else)[^\n?؟]*(?:\?|\؟)?\s*$/i
   ];
   let changed = true;
   while (changed) {
@@ -722,6 +705,7 @@ function ensureRelatedQuestions(text = "") {
 
 function buildFallbackRelatedQuestions(text = "") {
   const t = String(text || "").toLowerCase();
+  if (isGreetingLikeAssistantContent(text)) return [];
   if (/warfarin|amiodarone|inr|bleeding/.test(t)) {
     return [
       "Explain the INR monitoring plan after starting amiodarone with warfarin.",
@@ -771,6 +755,94 @@ function buildFallbackRelatedQuestions(text = "") {
   ];
 }
 
+function createRelatedQuestionsNode(questions = []) {
+  const wrap = document.createElement("div");
+  wrap.className = "related-questions";
+  const title = document.createElement("div");
+  title.className = "related-title";
+  title.textContent = "Suggested next questions";
+  wrap.appendChild(title);
+  questions.slice(0, 3).forEach(question => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "related-chip";
+    btn.textContent = question;
+    btn.addEventListener("click", () => {
+      els.messageInput.value = question;
+      autoGrow(els.messageInput);
+      els.messageInput.focus();
+    });
+    wrap.appendChild(btn);
+  });
+  return wrap;
+}
+
+function compactPreview(text = "", max = 84) {
+  return String(text || "")
+    .replace(/#+\s*/g, "")
+    .replace(/\[[!A-Z]+\]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, max) || "Empty message";
+}
+
+function setActiveRailSegment(index) {
+  if (!els.messageRail) return;
+  els.messageRail.querySelectorAll(".rail-segment").forEach(segment => {
+    segment.classList.toggle("active", Number(segment.dataset.targetIndex) === Number(index));
+  });
+}
+
+function updateActiveRailFromViewport() {
+  if (!els.messageRail) return;
+  const rows = Array.from(document.querySelectorAll(".message-row[data-message-index]"));
+  if (!rows.length) return;
+  const containerRect = els.messages.getBoundingClientRect();
+  const anchor = containerRect.top + containerRect.height * 0.38;
+  let best = rows[0];
+  let bestDistance = Infinity;
+  rows.forEach(row => {
+    const rect = row.getBoundingClientRect();
+    const center = rect.top + rect.height / 2;
+    const distance = Math.abs(center - anchor);
+    if (distance < bestDistance) {
+      best = row;
+      bestDistance = distance;
+    }
+  });
+  setActiveRailSegment(best.dataset.messageIndex);
+}
+
+function renderMessageRail() {
+  if (!els.messageRail) return;
+  const conversation = currentConversation();
+  els.messageRail.innerHTML = "";
+  const messages = conversation?.messages || [];
+  if (messages.length < 2) return;
+  messages.slice(-42).forEach((message, visibleIndex) => {
+    const absoluteIndex = messages.length > 42 ? messages.length - 42 + visibleIndex : visibleIndex;
+    const segment = document.createElement("button");
+    segment.type = "button";
+    segment.className = `rail-segment ${message.role}`;
+    segment.dataset.targetIndex = String(absoluteIndex);
+    segment.dataset.tooltip = `${message.role === "assistant" ? "Nexus" : "You"}: ${compactPreview(message.content)}`;
+    segment.title = segment.dataset.tooltip;
+    segment.setAttribute("aria-label", segment.dataset.tooltip);
+    segment.addEventListener("click", () => {
+      const target = document.querySelector(`[data-message-index="${absoluteIndex}"]`);
+      if (!target) return;
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+      target.classList.remove("jump-highlight");
+      void target.offsetWidth;
+      target.classList.add("jump-highlight");
+      setActiveRailSegment(absoluteIndex);
+      setTimeout(() => target.classList.remove("jump-highlight"), 1200);
+    });
+    els.messageRail.appendChild(segment);
+  });
+  updateActiveRailFromViewport();
+}
+
 function renderMarkdown(text = "") {
   let source = String(text || "");
   source = normalizeClinicalCallouts(source);
@@ -792,7 +864,7 @@ function normalizeClinicalCallouts(source = "") {
   const make = (type, body) => {
     const cleanType = String(type || "INFO").toUpperCase();
     const cleanBody = inlineMarkdown(body);
-    return `<div class="callout callout-${cleanType.toLowerCase()}"><div class="callout-icon">${cleanType === "WARNING" || cleanType === "IMPORTANT" ? "!" : "i"}</div><div class="callout-content"><div class="callout-title">${cleanType}</div><div class="callout-body">${cleanBody}</div></div></div>`;
+    return `<div class="callout callout-${cleanType.toLowerCase()}"><strong>${cleanType}</strong><span>${cleanBody}</span></div>`;
   };
 
   return String(source)
@@ -801,66 +873,13 @@ function normalizeClinicalCallouts(source = "") {
     .replace(/^(WARNING|IMPORTANT|INFO|NOTE|TIP)\s*[—-]\s*(.*)$/gim, (_, type, body) => make(type, body));
 }
 
-// ============ SAFETY PANEL ============
-function showSafetyPanel(alerts = []) {
-  if (!alerts.length) {
-    els.safetyPanel.classList.remove("open");
-    return;
-  }
-
-  els.safetyContent.innerHTML = alerts.map(alert => `
-    <div class="safety-item ${alert.severity === 'critical' ? 'danger' : ''}">
-      <div class="safety-item-title">${escapeHtml(alert.title)}</div>
-      <div class="safety-item-desc">${escapeHtml(alert.description)}</div>
-      ${alert.action ? `<div class="safety-item-action">Action: ${escapeHtml(alert.action)}</div>` : ''}
-    </div>
-  `).join('');
-
-  els.safetyPanel.classList.add("open");
-}
-
-function checkLocalSafety(text) {
-  const alerts = [];
-  const lower = text.toLowerCase();
-
-  const emergencyTerms = ['unconscious', 'seizure', 'severe bleeding', 'chest pain', 'anaphylaxis'];
-  if (emergencyTerms.some(t => lower.includes(t)) && !lower.includes('emergency') && !lower.includes('urgent')) {
-    alerts.push({
-      severity: 'critical',
-      title: 'Emergency Context Detected',
-      description: 'The response may involve emergency symptoms. Ensure proper escalation is mentioned.',
-      action: 'Add emergency disclaimer'
-    });
-  }
-
-  if (lower.includes('warfarin') && !lower.includes('inr')) {
-    alerts.push({
-      severity: 'high',
-      title: 'Warfarin without INR',
-      description: 'Warfarin discussion should typically include INR monitoring.',
-      action: 'Mention INR monitoring'
-    });
-  }
-
-  if (alerts.length) showSafetyPanel(alerts);
-}
-
-// ============ SMART AUTO-SCROLL ============
-let userScrolledUp = false;
-els.messages.addEventListener('scroll', () => {
-  const { scrollTop, scrollHeight, clientHeight } = els.messages;
-  userScrolledUp = scrollHeight - scrollTop - clientHeight > 100;
-});
-
-function scrollToBottom(force = false) {
-  if (force || !userScrolledUp) {
-    els.messages.scrollTop = els.messages.scrollHeight;
-  }
+function scrollToBottom() {
+  els.messages.scrollTop = els.messages.scrollHeight;
 }
 
 function autoGrow(el) {
   el.style.height = "auto";
-  el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+  el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
 }
 
 async function sendMessage(event) {
@@ -918,13 +937,13 @@ async function sendMessage(event) {
     conversation.mode = "general_chat";
     conversation.updated_at = nowIso();
     renderCurrentConversation();
-    await persistConversation(conversation, conversation);
+    await persistConversation(conversation, {});
     els.messageInput.focus();
     return;
   }
 
   renderCurrentConversation();
-  await persistConversation(conversation, conversation);
+  await persistConversation(conversation, {});
 
   await streamAssistantReply(conversation);
 }
@@ -946,40 +965,32 @@ function makeTitle(text) {
 
 async function buildAttachmentPayloads(files) {
   const payloads = [];
+  const unsupported = [];
   for (const file of files) {
     const item = {
       name: file.name,
       type: file.type || "application/octet-stream",
       size: file.size
     };
+
     if (/^(text\/|application\/json|text\/csv)/.test(item.type) || /\.(txt|md|csv|json)$/i.test(file.name)) {
       item.text = await file.text();
       if (item.text.length > 12000) item.text = `${item.text.slice(0, 12000)}\n\n[File truncated after 12,000 characters]`;
+      item.extractionStatus = "text_extracted";
+    } else {
+      item.extractionStatus = "not_extracted";
+      item.note = "Nexus currently receives this file metadata only. Paste the file text or upload .txt/.md/.csv/.json for content analysis.";
+      unsupported.push(file.name);
     }
+
     payloads.push(item);
   }
+
+  if (unsupported.length) {
+    showToast(`File content not extracted yet: ${unsupported.slice(0, 2).join(", ")}${unsupported.length > 2 ? "…" : ""}`);
+  }
+
   return payloads;
-}
-
-// ============ STREAMING WITH THINKING STATE ============
-function showThinkingState(container) {
-  const box = document.createElement("div");
-  box.className = "thinking-container";
-  box.innerHTML = `
-    <div class="thinking-pulse"></div>
-    <span class="thinking-text">Analyzing</span>
-    <span class="thinking-timer" id="thinkingTimer">0.0s</span>
-  `;
-  container.innerHTML = "";
-  container.appendChild(box);
-
-  const start = performance.now();
-  const timer = setInterval(() => {
-    const el = document.getElementById("thinkingTimer");
-    if (el) el.textContent = ((performance.now() - start) / 1000).toFixed(1) + "s";
-  }, 100);
-
-  return () => clearInterval(timer);
 }
 
 async function streamAssistantReply(conversation) {
@@ -993,10 +1004,15 @@ async function streamAssistantReply(conversation) {
   conversation.messages.push(assistantMessage);
   renderCurrentConversation();
 
-  const assistantRow = els.messagesInner.lastElementChild;
-  const assistantBody = assistantRow.querySelector(".message-bubble");
-
-  const clearTimer = showThinkingState(assistantBody);
+  const inner = document.getElementById("messagesInner");
+  const assistantRow = inner.lastElementChild;
+  const assistantBody = assistantRow.querySelector(".message-content");
+  assistantBody.innerHTML = `
+    <div class="thinking-box">
+      <span class="thinking-orb"><span>Nx</span></span>
+      <span class="thinking-text">Thinking <span class="loader-dots"><span></span><span></span><span></span></span> <b id="thinkingCounter">0.0s</b></span>
+    </div>
+  `;
 
   state.isGenerating = true;
   document.body.classList.add("generating");
@@ -1005,6 +1021,11 @@ async function streamAssistantReply(conversation) {
   els.sendBtn.disabled = true;
 
   const start = performance.now();
+  let firstChunk = false;
+  const timer = setInterval(() => {
+    const counter = document.getElementById("thinkingCounter");
+    if (counter) counter.textContent = `${((performance.now() - start) / 1000).toFixed(1)}s`;
+  }, 100);
 
   try {
     const response = await fetch(API_ENDPOINT, {
@@ -1035,44 +1056,76 @@ async function streamAssistantReply(conversation) {
       conversation.mode = serverMode;
     }
 
-    clearTimer();
-    assistantMessage.thinkingTime = (performance.now() - start) / 1000;
-
     const contentType = response.headers.get("content-type") || "";
     if (response.body && !contentType.includes("application/json")) {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
-      let buffer = "";
+      let targetBuffer = "";
+      let displayedBuffer = "";
+      let typingTimer = null;
+
+      const renderDisplayed = () => {
+        assistantMessage.content = displayedBuffer;
+        assistantBody.innerHTML = renderMarkdown(cleanAssistantVisibleContent(displayedBuffer));
+        assistantBody.classList.add("streaming");
+        scrollToBottom();
+      };
+
+      const startTyping = () => {
+        if (typingTimer) return;
+        typingTimer = setInterval(() => {
+          const remaining = targetBuffer.length - displayedBuffer.length;
+          if (remaining <= 0) return;
+          const step = remaining > 900 ? 30 : remaining > 360 ? 16 : remaining > 120 ? 7 : 3;
+          displayedBuffer += targetBuffer.slice(displayedBuffer.length, displayedBuffer.length + step);
+          renderDisplayed();
+        }, 18);
+      };
+
+      const waitForTyping = () => new Promise(resolve => {
+        const waiter = setInterval(() => {
+          if (displayedBuffer.length >= targetBuffer.length) {
+            clearInterval(waiter);
+            if (typingTimer) {
+              clearInterval(typingTimer);
+              typingTimer = null;
+            }
+            resolve();
+          }
+        }, 20);
+      });
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        assistantMessage.content = buffer;
-        assistantBody.innerHTML = renderMarkdown(cleanAssistantVisibleContent(buffer));
-        assistantBody.classList.add("streaming");
-        scrollToBottom();
+        const chunk = decoder.decode(value, { stream: true });
+        if (!firstChunk) {
+          firstChunk = true;
+          assistantMessage.thinkingTime = (performance.now() - start) / 1000;
+          assistantBody.innerHTML = "";
+        }
+        targetBuffer += chunk;
+        startTyping();
       }
 
+      await waitForTyping();
       assistantBody.classList.remove("streaming");
+      assistantMessage.content = targetBuffer;
     } else {
       const data = await response.json();
       assistantMessage.content = data.reply || "### Temporary response issue\nNexus did not receive text from the model for this turn. Please resend the question or choose a suggested clinical prompt below.";
       assistantMessage.thinkingTime = (performance.now() - start) / 1000;
-      assistantBody.innerHTML = renderMarkdown(cleanAssistantVisibleContent(assistantMessage.content));
+      assistantBody.classList.add("streaming");
+      await typeText(assistantMessage.content, assistantBody, assistantMessage);
+      assistantBody.classList.remove("streaming");
     }
 
     if (!assistantMessage.content.trim()) {
       assistantMessage.content = "### Temporary response issue\nNexus did not receive text from the model for this turn. Please resend the question or choose a suggested clinical prompt below.";
     }
-
     finalizeAssistantNode(assistantBody, assistantMessage);
-    await persistConversation(conversation, conversation);
-
-    checkLocalSafety(assistantMessage.content);
-
+    await persistConversation(conversation, {});
   } catch (error) {
-    clearTimer();
     if (error.name === "AbortError") {
       assistantMessage.content = `${assistantMessage.content}\n\n> [!NOTE] Generation stopped by user.`.trim();
     } else {
@@ -1080,8 +1133,9 @@ async function streamAssistantReply(conversation) {
     }
     assistantMessage.thinkingTime = (performance.now() - start) / 1000;
     finalizeAssistantNode(assistantBody, assistantMessage);
-    await persistConversation(conversation, conversation).catch(console.error);
+    await persistConversation(conversation, {}).catch(console.error);
   } finally {
+    clearInterval(timer);
     state.isGenerating = false;
     document.body.classList.remove("generating");
     state.abortController = null;
@@ -1091,43 +1145,40 @@ async function streamAssistantReply(conversation) {
 }
 
 function finalizeAssistantNode(body, message) {
-  const related = ensureRelatedQuestions(message.content);
+  const related = message.hideSuggestions ? [] : ensureRelatedQuestions(message.content);
   body.innerHTML = renderMarkdown(cleanAssistantVisibleContent(message.content));
-  if (related.length) {
-    const rq = document.createElement("div");
-    rq.className = "related-questions";
-    rq.innerHTML = `<div class="related-title">Suggested follow-ups</div>`;
-    const chips = document.createElement("div");
-    chips.className = "related-chips";
-    related.forEach(q => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "related-chip";
-      btn.textContent = q;
-      btn.addEventListener("click", () => {
-        els.messageInput.value = q;
-        autoGrow(els.messageInput);
-        els.messageInput.focus();
-      });
-      chips.appendChild(btn);
-    });
-    rq.appendChild(chips);
-    body.appendChild(rq);
-  }
-
-  if (message.thinkingTime) {
+  if (related.length) body.appendChild(createRelatedQuestionsNode(related));
+  if (message.thinkingTime && !message.hideThinkingTime) {
     const thinking = document.createElement("div");
     thinking.className = "thinking-time";
     thinking.textContent = `Thinking time: ${message.thinkingTime.toFixed(1)}s`;
     body.prepend(thinking);
   }
+  if (!message.hideDisclaimer && message.mode !== "general_chat") {
+    const disclaimer = document.createElement("div");
+    disclaimer.className = "disclaimer";
+    disclaimer.textContent = "Educational clinical decision support only. Confirm critical decisions with trusted references and local protocols.";
+    body.appendChild(disclaimer);
+  }
+  scrollToBottom();
+}
 
-  const disclaimer = document.createElement("div");
-  disclaimer.className = "message-disclaimer";
-  disclaimer.textContent = "Educational clinical decision support only. Verify with trusted references and local protocols.";
-  body.appendChild(disclaimer);
+async function typeText(text, element, message) {
+  let output = "";
+  const source = String(text || "");
+  const render = () => {
+    message.content = output;
+    element.innerHTML = renderMarkdown(cleanAssistantVisibleContent(output));
+  };
 
-  scrollToBottom(true);
+  for (let i = 0; i < source.length;) {
+    const remaining = source.length - i;
+    const step = remaining > 900 ? 42 : remaining > 360 ? 24 : remaining > 120 ? 12 : 5;
+    output += source.slice(i, i + step);
+    i += step;
+    render();
+    await new Promise(resolve => setTimeout(resolve, 18));
+  }
 }
 
 function parseErrorText(text) {
@@ -1144,7 +1195,7 @@ function setComposerDisabled(disabled) {
   els.messageInput.disabled = disabled;
   els.attachBtn.disabled = disabled;
   els.sendBtn.disabled = disabled;
-  els.messageInput.placeholder = disabled ? "Shared conversation is read-only" : "Ask about a drug, case, or interaction…";
+  els.messageInput.placeholder = disabled ? "Shared conversation is read-only" : "Message Nexus…";
 }
 
 function renderFileChips() {
@@ -1152,7 +1203,7 @@ function renderFileChips() {
   els.attachedFiles.classList.toggle("hidden", state.pendingFiles.length === 0);
   state.pendingFiles.forEach((file, index) => {
     const chip = document.createElement("span");
-    chip.className = "attachment-chip";
+    chip.className = "file-chip";
     chip.innerHTML = `📎 ${escapeHtml(file.name)} <button type="button" aria-label="Remove file">×</button>`;
     chip.querySelector("button").addEventListener("click", () => {
       state.pendingFiles.splice(index, 1);
@@ -1176,11 +1227,11 @@ function openConversationMenu(event, conversation) {
   menu.style.top = `${top}px`;
   menu.style.left = `${left}px`;
   menu.innerHTML = `
-    <button class="dropdown-item" data-action="pin">${conversation.pinned ? "Unpin" : "Pin"}</button>
-    <button class="dropdown-item" data-action="rename">Rename</button>
-    <button class="dropdown-item" data-action="share">Share</button>
-    <button class="dropdown-item" data-action="archive">${conversation.archived ? "Unarchive" : "Archive"}</button>
-    <button class="dropdown-item danger" data-action="delete">Delete</button>
+    <button class="menu-btn" data-action="pin">${conversation.pinned ? "Unpin" : "Pin"}</button>
+    <button class="menu-btn" data-action="rename">Rename</button>
+    <button class="menu-btn" data-action="share">Share</button>
+    <button class="menu-btn" data-action="archive">${conversation.archived ? "Unarchive" : "Archive"}</button>
+    <button class="menu-btn danger" data-action="delete">Delete</button>
   `;
   menu.addEventListener("click", async (e) => {
     const action = e.target.closest("[data-action]")?.dataset.action;
@@ -1245,7 +1296,7 @@ async function shareConversation(conversation) {
       url = `${location.origin}${location.pathname}?share=${shareId}`;
     }
     await navigator.clipboard.writeText(url);
-    showToast("Share link copied");
+    showToast(HAS_SUPABASE ? "Share link copied" : "Share link copied (local demo only)");
   } catch (error) {
     showToast(error.message || "Could not create share link");
   }
@@ -1282,6 +1333,105 @@ async function loadSharedConversation(shareId) {
   return true;
 }
 
+async function exportConversationPdf(conversation = currentConversation()) {
+  if (!conversation) return;
+
+  const report = buildPdfReportNode(conversation);
+  report.style.position = "absolute";
+  report.style.left = "0";
+  report.style.top = "0";
+  report.style.zIndex = "-1";
+  report.style.background = "#ffffff";
+  document.body.prepend(report);
+  if (document.fonts?.ready) {
+    try { await document.fonts.ready; } catch {}
+  }
+  await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+  const filename = `${safeFilename(conversation.title || makeTitle(conversation.messages?.find(m => m.role === "user")?.content || "nexus-chat"))}.pdf`;
+
+  try {
+    if (window.html2pdf) {
+      await window.html2pdf()
+        .set({
+          margin: [8, 8, 8, 8],
+          filename,
+          image: { type: "jpeg", quality: 0.98 },
+          html2canvas: {
+            scale: Math.min(2.2, window.devicePixelRatio || 2),
+            useCORS: true,
+            backgroundColor: "#ffffff",
+            scrollX: 0,
+            scrollY: 0,
+            windowWidth: 794
+          },
+          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+          pagebreak: { mode: ["css", "legacy"], avoid: [".pdf-message", ".pdf-callout"] }
+        })
+        .from(report)
+        .save();
+      showToast("PDF exported cleanly");
+    } else {
+      const printWindow = window.open("", "_blank");
+      if (!printWindow) throw new Error("Popup blocked. Allow popups to print/export.");
+      printWindow.document.write(`<!doctype html><html><head><title>${escapeHtml(filename)}</title></head><body>${report.outerHTML}</body></html>`);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+    }
+  } catch (error) {
+    showToast(error.message || "PDF export failed");
+  } finally {
+    report.remove();
+  }
+}
+
+function buildPdfReportNode(conversation) {
+  const node = document.createElement("article");
+  node.className = "pdf-report";
+  node.dir = /[؀-ۿ]/.test(JSON.stringify(conversation.messages || [])) ? "auto" : "ltr";
+
+  const modeLabel = MODE_META[conversation.mode]?.label || "General Chat";
+  const title = conversation.title || makeTitle(conversation.messages?.find(m => m.role === "user")?.content || "Nexus report");
+  const generated = new Date().toLocaleString();
+
+  node.innerHTML = `
+    <header class="pdf-header">
+      <div class="pdf-brand">Nx</div>
+      <div>
+        <h1>${escapeHtml(title)}</h1>
+        <p>${escapeHtml(modeLabel)} · Generated ${escapeHtml(generated)}</p>
+      </div>
+    </header>
+    <section class="pdf-meta-box">
+      Educational clinical decision support only. Confirm critical decisions with trusted references and local protocols.
+    </section>
+    <main class="pdf-body"></main>
+  `;
+
+  const body = node.querySelector(".pdf-body");
+  (conversation.messages || []).forEach(message => {
+    const block = document.createElement("section");
+    block.className = `pdf-message ${message.role === "assistant" ? "assistant" : "user"}`;
+    const label = message.role === "assistant" ? "Nexus" : "User";
+    const attachments = message.attachments?.length
+      ? `<div class="pdf-attachments"><b>Attachments:</b> ${escapeHtml(message.attachments.map(f => f.name).join(", "))}</div>`
+      : "";
+    block.innerHTML = `
+      <div class="pdf-role">${label}</div>
+      <div class="pdf-content">${message.role === "assistant" ? renderMarkdown(message.content) : escapeHtml(message.content).replace(/\n/g, "<br>")}</div>
+      ${attachments}
+    `;
+    body.appendChild(block);
+  });
+
+  return node;
+}
+
+function safeFilename(name) {
+  return name.toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/gi, "-").replace(/^-|-$/g, "").slice(0, 70) || "nexus-chat";
+}
+
 function openSidebarMobile() {
   els.sidebar.classList.add("open");
   els.sidebarBackdrop.classList.add("show");
@@ -1297,32 +1447,6 @@ async function handleNewChatClick() {
   closeSidebarMobile();
   setTimeout(() => els.messageInput.focus(), 80);
 }
-
-// ============ KEYBOARD SHORTCUTS ============
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && state.isGenerating) {
-    state.abortController?.abort();
-  }
-
-  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'N') {
-    e.preventDefault();
-    handleNewChatClick();
-  }
-
-  if ((e.ctrlKey || e.metaKey) && e.key === '/') {
-    e.preventDefault();
-    els.messageInput.focus();
-  }
-
-  if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
-    e.preventDefault();
-    if (els.sidebar.classList.contains('open')) {
-      closeSidebarMobile();
-    } else {
-      openSidebarMobile();
-    }
-  }
-});
 
 function bindEvents() {
   els.loginTab.addEventListener("click", () => setAuthMode("login"));
@@ -1341,7 +1465,7 @@ function bindEvents() {
     state.currentConversationId = state.conversations[0]?.id || null;
     renderAll();
   });
-  document.querySelectorAll(".mode-chip").forEach(btn => {
+  document.querySelectorAll(".mode-btn, .mode-chip-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       selectMode(btn.dataset.mode);
       closeSidebarMobile();
@@ -1363,10 +1487,13 @@ function bindEvents() {
     renderFileChips();
   });
   els.stopBtn.addEventListener("click", () => state.abortController?.abort());
-  els.closeSafetyPanel?.addEventListener("click", () => els.safetyPanel.classList.remove("open"));
 
+  els.messages.addEventListener("scroll", () => {
+    if (updateActiveRailFromViewport.raf) cancelAnimationFrame(updateActiveRailFromViewport.raf);
+    updateActiveRailFromViewport.raf = requestAnimationFrame(updateActiveRailFromViewport);
+  }, { passive: true });
   document.addEventListener("click", (event) => {
-    if (state.dropdown && !event.target.closest(".dropdown") && !event.target.closest(".history-actions")) closeDropdown();
+    if (state.dropdown && !event.target.closest(".dropdown") && !event.target.closest(".history-dots")) closeDropdown();
   });
 }
 
