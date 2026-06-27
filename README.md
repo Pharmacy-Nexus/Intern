@@ -107,3 +107,21 @@ Expected: auto-switch to Drug Interaction.
 Patient 65 years old, eGFR 28, taking metformin. Is it safe?
 ```
 Expected: auto-switch to Case Analysis.
+
+
+## v4.8.2 No-Auth Build
+
+This build removes the login gate completely. The app opens directly into a local workspace and uses localStorage for chat history. Supabase Auth and Supabase database are not required for testing the model/API.
+
+Keep only these Vercel environment variables for the AI endpoint:
+
+```env
+NVIDIA_API_KEY=your_key_here
+NVIDIA_API_URL=https://integrate.api.nvidia.com/v1/chat/completions
+NVIDIA_MODEL=moonshotai/kimi-k2.6
+NVIDIA_MAX_TOKENS=850
+NEXUS_FAST_LOCAL_FIRST=true
+NEXUS_COMPOSER_TIMEOUT_MS=25000
+```
+
+The old auth UI is hidden and the workspace starts immediately.

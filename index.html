@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#0f172a" />
   <title>Nexus Clinical Pharmacist</title>
 
-
   <script>
+    // No-auth build: open the workspace directly and call the Vercel API.
     window.NEXUS_API_ENDPOINT = window.NEXUS_API_ENDPOINT || "/api/chat";
   </script>
 
@@ -17,7 +17,7 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body data-theme="light" data-mode="general_chat">
-  <section id="authPage" class="auth-page">
+  <section id="authPage" class="auth-page hidden" aria-hidden="true">
     <div class="auth-art">
       <div class="auth-logo">Nx</div>
       <div class="auth-copy">
@@ -75,7 +75,7 @@
     </div>
   </section>
 
-  <div id="appRoot" class="app-shell hidden">
+  <div id="appRoot" class="app-shell">
     <div id="sidebarBackdrop" class="sidebar-backdrop"></div>
 
     <aside id="sidebar" class="sidebar" aria-label="Application sidebar">

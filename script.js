@@ -1,17 +1,6 @@
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
-
 const API_ENDPOINT = window.NEXUS_API_ENDPOINT || "/api/chat";
-
-function isValidHttpUrl(value) {
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:" || url.protocol === "http:";
-  } catch {
-    return false;
-  }
-}
-const HAS_SUPABASE = Boolean(isValidHttpUrl(SUPABASE_URL) && SUPABASE_ANON_KEY.length > 20);
-const supabase = HAS_SUPABASE ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+const HAS_SUPABASE = false;
+const supabase = null;
 
 const MODE_META = {
   general_chat: {
@@ -238,9 +227,10 @@ async function handleAuthSubmit(event) {
 }
 
 function showAuth() {
-  document.body.classList.remove("app-active", "generating");
-  els.authPage.classList.remove("hidden");
-  els.appRoot.classList.add("hidden");
+  // No-auth build: never block the user behind a login screen.
+  document.body.classList.add("app-active");
+  els.authPage?.classList.add("hidden");
+  els.appRoot?.classList.remove("hidden");
 }
 
 async function enterApp(user, options = {}) {
@@ -279,16 +269,15 @@ function updateUserCard() {
 }
 
 async function logout() {
-  if (HAS_SUPABASE && !state.readOnlyShare) {
-    await supabase.auth.signOut();
-  } else {
-    localStorage.removeItem(localUserKey());
-  }
+  localStorage.removeItem(localUserKey());
   state.user = null;
   state.conversations = [];
   state.currentConversationId = null;
   state.readOnlyShare = false;
-  showAuth();
+  const localUser = buildLocalUser("local@nexus.app", "Nexus User");
+  setLocalJson(localUserKey(), localUser);
+  await enterApp(localUser);
+  showToast("Local workspace reset.");
 }
 
 async function loadConversations() {
@@ -1482,10 +1471,10 @@ async function handleNewChatClick() {
 }
 
 function bindEvents() {
-  els.loginTab.addEventListener("click", () => setAuthMode("login"));
-  els.signupTab.addEventListener("click", () => setAuthMode("signup"));
-  els.authForm.addEventListener("submit", handleAuthSubmit);
-  els.logoutBtn.addEventListener("click", logout);
+  els.loginTab?.addEventListener("click", () => setAuthMode("login"));
+  els.signupTab?.addEventListener("click", () => setAuthMode("signup"));
+  els.authForm?.addEventListener("submit", handleAuthSubmit);
+  els.logoutBtn?.addEventListener("click", logout);
   els.newChatBtn.addEventListener("click", handleNewChatClick);
   els.newChatTopBtn?.addEventListener("click", handleNewChatClick);
   els.themeToggleBtn.addEventListener("click", () => applyTheme(document.body.dataset.theme === "dark" ? "light" : "dark"));
@@ -1532,7 +1521,6 @@ function bindEvents() {
 
 async function init() {
   bindEvents();
-  setAuthMode("login");
   applyTheme(localStorage.getItem("nexus_theme") || "light");
 
   const params = new URLSearchParams(location.search);
@@ -1542,29 +1530,9 @@ async function init() {
     return;
   }
 
-  if (HAS_SUPABASE) {
-    try {
-      const { data } = await withTimeout(
-        supabase.auth.getSession(),
-        5000,
-        "Supabase session check timed out"
-      );
-      supabase.auth.onAuthStateChange((_event, session) => {
-        if (session?.user && !state.user) enterApp(session.user);
-        if (!session?.user && state.user && !state.readOnlyShare) showAuth();
-      });
-      if (data.session?.user) await enterApp(data.session.user);
-      else showAuth();
-    } catch (error) {
-      console.warn(error);
-      showAuth();
-      setAuthMessage("Supabase did not respond. You can still login in local demo mode by clearing Supabase values.", true);
-    }
-  } else {
-    const localUser = getLocalJson(localUserKey(), null);
-    if (localUser) await enterApp(localUser);
-    else showAuth();
-  }
+  const localUser = getLocalJson(localUserKey(), null) || buildLocalUser("local@nexus.app", "Nexus User");
+  setLocalJson(localUserKey(), localUser);
+  await enterApp(localUser);
 }
 
 init().catch(error => {
