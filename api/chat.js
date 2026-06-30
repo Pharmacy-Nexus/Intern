@@ -194,7 +194,7 @@ module.exports = async (req, res) => {
 
     const evidence = retrieveEvidence(parsed, DATA, `${latestUserText}\n${recentContextText}`);
     const triage = triageRisk(parsed, evidence, latestUserText, DATA);
-    const { validation, conflictResolver, pipelineContext } = buildEvidenceBrief({ mode, parsed, evidence, triage });
+    const { validation, conflictResolver, shadowCheck, pipelineContext } = buildEvidenceBrief({ mode, parsed, evidence, triage, latestUserText });
 
     let upstream;
     try {
@@ -233,6 +233,7 @@ module.exports = async (req, res) => {
     res.setHeader('X-Nexus-Mode', mode);
     res.setHeader('X-Nexus-Risk', triage.level);
     res.setHeader('X-Nexus-Parser', parsed.parser || 'local_tool_layer');
+    if (shadowCheck?.enabled) res.setHeader('X-Nexus-Shadow', 'enabled');
 
     if (shouldStream && upstream.body) {
       const emptyStreamFallback = localFallbackAnswer({ parsed, evidence, triage, validation });
