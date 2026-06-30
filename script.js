@@ -2,7 +2,9 @@ const API_ENDPOINT = window.NEXUS_API_ENDPOINT || "/api/chat";
 const MAX_CONTEXT_MESSAGES_TO_SEND = 16;
 const MAX_ATTACHMENTS = 4;
 const MAX_TEXT_FILE_BYTES = 750 * 1024;
-console.info("Nexus build", window.NEXUS_BUILD || "v4.8.4-auditfix");
+const MAX_QUICK_ACCESS_NOTES = 120;
+const MAX_QUICK_ACCESS_CONTEXT_NOTES = 5;
+console.info("Nexus build", window.NEXUS_BUILD || "v4.9.0-quick-access");
 const HAS_SUPABASE = false;
 const supabase = null;
 
@@ -65,7 +67,19 @@ const els = {
   attachedFiles: document.getElementById("attachedFiles"),
   newChatTopBtn: document.getElementById("newChatTopBtn"),
   modeSwitcher: document.getElementById("modeSwitcher"),
-  toast: document.getElementById("toast")
+  toast: document.getElementById("toast"),
+  quickAccessAddBtn: document.getElementById("quickAccessAddBtn"),
+  quickAccessSearch: document.getElementById("quickAccessSearch"),
+  quickAccessList: document.getElementById("quickAccessList"),
+  quickAccessCount: document.getElementById("quickAccessCount"),
+  quickAccessModal: document.getElementById("quickAccessModal"),
+  quickAccessModalTitle: document.getElementById("quickAccessModalTitle"),
+  quickAccessTitleInput: document.getElementById("quickAccessTitleInput"),
+  quickAccessTagsInput: document.getElementById("quickAccessTagsInput"),
+  quickAccessContentInput: document.getElementById("quickAccessContentInput"),
+  quickAccessCancelBtn: document.getElementById("quickAccessCancelBtn"),
+  quickAccessSaveBtn: document.getElementById("quickAccessSaveBtn"),
+  quickAccessDeleteBtn: document.getElementById("quickAccessDeleteBtn")
 };
 
 let state = {
@@ -80,7 +94,10 @@ let state = {
   isGenerating: false,
   readOnlyShare: false,
   dropdown: null,
-  editingMessageIndex: null
+  editingMessageIndex: null,
+  quickAccess: [],
+  quickAccessSearch: "",
+  editingQuickAccessId: null
 };
 
 function nowIso() {
@@ -114,6 +131,7 @@ function setAuthMessage(message, isError = false) {
 function localUserKey() { return "nexus_local_user"; }
 function localConversationsKey() { return `nexus_conversations_${state.user?.id || "guest"}`; }
 function localSharesKey() { return "nexus_local_shares"; }
+function localQuickAccessKey() { return `nexus_quick_access_${state.user?.id || "guest"}`; }
 
 function getLocalJson(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); }
@@ -256,6 +274,8 @@ async function enterApp(user, options = {}) {
   els.appRoot?.classList.remove("hidden");
   updateUserCard();
   applyTheme(localStorage.getItem("nexus_theme") || "light");
+  loadQuickAccess();
+  renderQuickAccess();
 
   if (state.readOnlyShare) {
     renderHistory();
@@ -455,8 +475,256 @@ function applyTheme(theme) {
   els.themeToggleBtn.querySelector("span:last-child").textContent = safeTheme === "dark" ? "Light mode" : "Dark mode";
 }
 
+
+function normalizeTags(value = "") {
+  if (Array.isArray(value)) value = value.join(",");
+  return Array.from(new Set(String(value || "")
+    .split(/[#,،,;\s]+/)
+    .map(tag => tag.trim().toLowerCase())
+    .filter(Boolean)
+    .slice(0, 8)));
+}
+
+function quickAccessPreview(text = "", max = 110) {
+  return String(text || "")
+    .replace(/#+\s*/g, "")
+    .replace(/[\n\r]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, max) || "No content";
+}
+
+function normalizeQuickAccessNote(note = {}) {
+  const title = String(note.title || "").trim() || makeTitle(note.content || "Quick note");
+  const content = String(note.content || "").trim();
+  return {
+    id: note.id || uid("qa"),
+    title: title.slice(0, 80),
+    tags: normalizeTags(note.tags || []),
+    content: content.slice(0, 6000),
+    created_at: note.created_at || nowIso(),
+    updated_at: note.updated_at || nowIso()
+  };
+}
+
+function loadQuickAccess() {
+  if (!state.user) return;
+  state.quickAccess = getLocalJson(localQuickAccessKey(), [])
+    .map(normalizeQuickAccessNote)
+    .filter(note => note.content)
+    .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+    .slice(0, MAX_QUICK_ACCESS_NOTES);
+}
+
+function saveQuickAccess() {
+  if (!state.user) return;
+  setLocalJson(localQuickAccessKey(), state.quickAccess.slice(0, MAX_QUICK_ACCESS_NOTES));
+}
+
+function tokenizeQuickText(text = "") {
+  return Array.from(new Set(String(text || "")
+    .toLowerCase()
+    .replace(/[#*_`~()[\]{}.,:;!?،؛؟/\\|+\-=]/g, " ")
+    .split(/\s+/)
+    .map(token => token.trim())
+    .filter(token => token.length >= 3)
+    .slice(0, 140)));
+}
+
+function scoreQuickAccessNote(note, text = "") {
+  const hay = `${note.title} ${(note.tags || []).join(" ")} ${note.content}`.toLowerCase();
+  const tokens = tokenizeQuickText(text);
+  let score = 0;
+  for (const token of tokens) {
+    if ((note.tags || []).some(tag => tag.includes(token) || token.includes(tag))) score += 5;
+    if (String(note.title || "").toLowerCase().includes(token)) score += 3;
+    if (hay.includes(token)) score += 1;
+  }
+  return score;
+}
+
+function getRelevantQuickAccess(text = "", limit = 3) {
+  const source = String(text || "").trim();
+  if (!source || !state.quickAccess.length) return [];
+  return state.quickAccess
+    .map(note => ({ note, score: scoreQuickAccessNote(note, source) }))
+    .filter(item => item.score >= 2)
+    .sort((a, b) => b.score - a.score || new Date(b.note.updated_at) - new Date(a.note.updated_at))
+    .slice(0, limit)
+    .map(item => item.note);
+}
+
+function getLatestUserMessageText(conversation = currentConversation()) {
+  const messages = conversation?.messages || [];
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    if (messages[i]?.role === "user") return messages[i].content || "";
+  }
+  return "";
+}
+
+function buildQuickAccessContext(latestUserText = "") {
+  const notes = getRelevantQuickAccess(latestUserText, MAX_QUICK_ACCESS_CONTEXT_NOTES);
+  if (!notes.length) return "";
+  return notes.map((note, index) => {
+    const tags = note.tags?.length ? ` | Tags: ${note.tags.join(", ")}` : "";
+    return `Quick Access ${index + 1}: ${note.title}${tags}\n${note.content.slice(0, 1400)}`;
+  }).join("\n\n---\n\n");
+}
+
+function renderQuickAccess() {
+  if (!els.quickAccessList) return;
+  const query = String(state.quickAccessSearch || "").trim().toLowerCase();
+  const notes = state.quickAccess.filter(note => {
+    if (!query) return true;
+    const hay = `${note.title} ${(note.tags || []).join(" ")} ${note.content}`.toLowerCase();
+    return hay.includes(query.replace(/^#/, ""));
+  });
+
+  if (els.quickAccessCount) els.quickAccessCount.textContent = `${state.quickAccess.length} saved`;
+  els.quickAccessList.innerHTML = "";
+  if (!notes.length) {
+    const empty = document.createElement("div");
+    empty.className = "quick-empty";
+    empty.textContent = state.quickAccess.length ? "No matching notes." : "Save rules, scripts, or templates here. Relevant notes can appear under answers and be sent as context.";
+    els.quickAccessList.appendChild(empty);
+    return;
+  }
+
+  notes.slice(0, 30).forEach(note => {
+    const item = document.createElement("article");
+    item.className = "quick-item";
+    item.role = "listitem";
+    item.innerHTML = `
+      <div class="quick-item-top">
+        <div class="quick-item-title">${escapeHtml(note.title)}</div>
+      </div>
+      <div class="quick-item-preview">${escapeHtml(quickAccessPreview(note.content, 140))}</div>
+      ${note.tags?.length ? `<div class="quick-tags">${note.tags.map(tag => `<span class="quick-tag">#${escapeHtml(tag)}</span>`).join("")}</div>` : ""}
+      <div class="quick-item-actions">
+        <button class="quick-mini-btn" type="button" data-action="insert">Insert</button>
+        <button class="quick-mini-btn" type="button" data-action="edit">Edit</button>
+        <button class="quick-mini-btn danger" type="button" data-action="delete">Delete</button>
+      </div>
+    `;
+    item.addEventListener("click", (event) => {
+      const action = event.target.closest("[data-action]")?.dataset.action;
+      if (!action) return;
+      if (action === "insert") return insertQuickAccessNote(note);
+      if (action === "edit") return openQuickAccessModal(note);
+      if (action === "delete") return deleteQuickAccessNote(note.id);
+    });
+    els.quickAccessList.appendChild(item);
+  });
+}
+
+function createQuickRecallNode(text = "") {
+  const notes = getRelevantQuickAccess(text, 3);
+  if (!notes.length) return null;
+  const wrap = document.createElement("div");
+  wrap.className = "quick-recall";
+  const title = document.createElement("div");
+  title.className = "quick-recall-title";
+  title.textContent = "From My Quick Access";
+  wrap.appendChild(title);
+  const list = document.createElement("div");
+  list.className = "quick-recall-list";
+  notes.forEach(note => {
+    const item = document.createElement("div");
+    item.className = "quick-recall-item";
+    item.innerHTML = `<strong>${escapeHtml(note.title)}</strong><span>${escapeHtml(quickAccessPreview(note.content, 155))}</span>`;
+    list.appendChild(item);
+  });
+  wrap.appendChild(list);
+  return wrap;
+}
+
+function getSelectedTextInside(row) {
+  const selection = window.getSelection?.();
+  const selected = String(selection?.toString() || "").trim();
+  if (!selected || !selection.rangeCount || !row) return "";
+  const range = selection.getRangeAt(0);
+  const ancestor = range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement;
+  return row.contains(ancestor) ? selected : "";
+}
+
+function openQuickAccessModal(note = null, seed = {}) {
+  if (!els.quickAccessModal) return;
+  state.editingQuickAccessId = note?.id || null;
+  els.quickAccessModalTitle.textContent = note ? "Edit Quick Access" : "Save to Quick Access";
+  els.quickAccessTitleInput.value = note?.title || seed.title || "";
+  els.quickAccessTagsInput.value = (note?.tags || seed.tags || []).join(", ");
+  els.quickAccessContentInput.value = note?.content || seed.content || "";
+  els.quickAccessDeleteBtn.classList.toggle("hidden", !note);
+  els.quickAccessModal.classList.remove("hidden");
+  setTimeout(() => (els.quickAccessTitleInput.value ? els.quickAccessContentInput : els.quickAccessTitleInput).focus(), 50);
+}
+
+function closeQuickAccessModal() {
+  state.editingQuickAccessId = null;
+  els.quickAccessModal?.classList.add("hidden");
+}
+
+function saveQuickAccessFromModal() {
+  const content = els.quickAccessContentInput.value.trim();
+  if (!content) return showToast("Add note content first.");
+  const title = els.quickAccessTitleInput.value.trim() || makeTitle(content);
+  const tags = normalizeTags(els.quickAccessTagsInput.value);
+  const existingIndex = state.quickAccess.findIndex(note => note.id === state.editingQuickAccessId);
+  const note = normalizeQuickAccessNote({
+    ...(existingIndex >= 0 ? state.quickAccess[existingIndex] : {}),
+    title,
+    tags,
+    content,
+    updated_at: nowIso()
+  });
+  if (existingIndex >= 0) state.quickAccess.splice(existingIndex, 1, note);
+  else state.quickAccess.unshift(note);
+  state.quickAccess = state.quickAccess
+    .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+    .slice(0, MAX_QUICK_ACCESS_NOTES);
+  saveQuickAccess();
+  renderQuickAccess();
+  renderCurrentConversation();
+  closeQuickAccessModal();
+  showToast("Saved to Quick Access");
+}
+
+function deleteQuickAccessNote(id = state.editingQuickAccessId) {
+  if (!id) return;
+  const note = state.quickAccess.find(item => item.id === id);
+  if (!note) return;
+  if (!confirm(`Delete Quick Access note “${note.title}”?`)) return;
+  state.quickAccess = state.quickAccess.filter(item => item.id !== id);
+  saveQuickAccess();
+  renderQuickAccess();
+  renderCurrentConversation();
+  closeQuickAccessModal();
+  showToast("Quick Access note deleted");
+}
+
+function saveMessageToQuickAccess(row, role, content = "") {
+  const selected = getSelectedTextInside(row);
+  const bodyText = selected || String(content || "").trim();
+  if (!bodyText) return;
+  openQuickAccessModal(null, {
+    title: makeTitle(bodyText),
+    tags: role === "assistant" ? ["nexus"] : ["case"],
+    content: bodyText
+  });
+}
+
+function insertQuickAccessNote(note) {
+  const current = els.messageInput.value.trim();
+  const block = `${note.title}\n${note.content}`.trim();
+  els.messageInput.value = current ? `${current}\n\n${block}` : block;
+  autoGrow(els.messageInput);
+  els.messageInput.focus();
+  showToast("Inserted into composer");
+}
+
 function renderAll() {
   renderHistory();
+  renderQuickAccess();
   renderCurrentConversation();
 }
 
@@ -623,6 +891,11 @@ function createMessageNode(role, content, options = {}) {
     body.appendChild(createRelatedQuestionsNode(related));
   }
 
+  if (role === "assistant") {
+    const recall = createQuickRecallNode(cleanContent);
+    if (recall) body.appendChild(recall);
+  }
+
   if (role === "assistant" && options.thinkingTime) {
     const thinking = document.createElement("div");
     thinking.className = "thinking-time";
@@ -638,6 +911,14 @@ function createMessageNode(role, content, options = {}) {
   copyBtn.textContent = "Copy";
   copyBtn.addEventListener("click", () => copyMessageText(role === "assistant" ? (row.querySelector(".message-content")?.innerText || cleanContent) : cleanContent));
   actions.appendChild(copyBtn);
+
+  const quickBtn = document.createElement("button");
+  quickBtn.type = "button";
+  quickBtn.className = "message-action-btn save-quick";
+  quickBtn.textContent = "Quick";
+  quickBtn.title = "Save selected text or this message to My Quick Access";
+  quickBtn.addEventListener("click", () => saveMessageToQuickAccess(row, role, role === "assistant" ? cleanContent : content));
+  actions.appendChild(quickBtn);
 
   if (role === "user" && Number.isInteger(options.index) && !state.readOnlyShare) {
     const editBtn = document.createElement("button");
@@ -1101,6 +1382,7 @@ async function streamAssistantReply(conversation) {
         mode: state.activeMode,
         modeInstruction: MODE_META[state.activeMode].prompt,
         messages: buildApiMessages(conversation.messages),
+        quickAccessContext: buildQuickAccessContext(getLatestUserMessageText(conversation)),
         stream: true
       }),
       signal: state.abortController.signal
@@ -1210,6 +1492,8 @@ function finalizeAssistantNode(body, message) {
   const related = message.hideSuggestions ? [] : ensureRelatedQuestions(message.content);
   body.innerHTML = renderMarkdown(cleanAssistantVisibleContent(message.content));
   if (related.length) body.appendChild(createRelatedQuestionsNode(related));
+  const recall = createQuickRecallNode(message.content);
+  if (recall) body.appendChild(recall);
   if (message.thinkingTime && !message.hideThinkingTime) {
     const thinking = document.createElement("div");
     thinking.className = "thinking-time";
@@ -1564,6 +1848,20 @@ function bindEvents() {
     renderFileChips();
   });
   els.stopBtn.addEventListener("click", () => state.abortController?.abort());
+  els.quickAccessAddBtn?.addEventListener("click", () => openQuickAccessModal(null, { title: "", tags: [], content: "" }));
+  els.quickAccessSearch?.addEventListener("input", () => {
+    state.quickAccessSearch = els.quickAccessSearch.value || "";
+    renderQuickAccess();
+  });
+  els.quickAccessSaveBtn?.addEventListener("click", saveQuickAccessFromModal);
+  els.quickAccessCancelBtn?.addEventListener("click", closeQuickAccessModal);
+  els.quickAccessDeleteBtn?.addEventListener("click", () => deleteQuickAccessNote());
+  els.quickAccessModal?.addEventListener("click", (event) => {
+    if (event.target === els.quickAccessModal) closeQuickAccessModal();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !els.quickAccessModal?.classList.contains("hidden")) closeQuickAccessModal();
+  });
 
   els.messages.addEventListener("scroll", () => {
     if (updateActiveRailFromViewport.raf) cancelAnimationFrame(updateActiveRailFromViewport.raf);
