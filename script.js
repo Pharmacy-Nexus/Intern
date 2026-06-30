@@ -4,7 +4,8 @@ const MAX_ATTACHMENTS = 4;
 const MAX_TEXT_FILE_BYTES = 750 * 1024;
 const MAX_QUICK_ACCESS_NOTES = 120;
 const MAX_QUICK_ACCESS_CONTEXT_NOTES = 5;
-console.info("Nexus build", window.NEXUS_BUILD || "v4.9.0-quick-access");
+const MAX_WORK_SHELF_ITEMS = 60;
+console.info("Nexus build", window.NEXUS_BUILD || "v5.0.0-work-shelf");
 const HAS_SUPABASE = false;
 const supabase = null;
 
@@ -79,7 +80,10 @@ const els = {
   quickAccessContentInput: document.getElementById("quickAccessContentInput"),
   quickAccessCancelBtn: document.getElementById("quickAccessCancelBtn"),
   quickAccessSaveBtn: document.getElementById("quickAccessSaveBtn"),
-  quickAccessDeleteBtn: document.getElementById("quickAccessDeleteBtn")
+  quickAccessDeleteBtn: document.getElementById("quickAccessDeleteBtn"),
+  workShelfList: document.getElementById("workShelfList"),
+  workShelfCount: document.getElementById("workShelfCount"),
+  workShelfClearBtn: document.getElementById("workShelfClearBtn")
 };
 
 let state = {
@@ -97,7 +101,8 @@ let state = {
   editingMessageIndex: null,
   quickAccess: [],
   quickAccessSearch: "",
-  editingQuickAccessId: null
+  editingQuickAccessId: null,
+  workShelf: []
 };
 
 function nowIso() {
@@ -132,6 +137,7 @@ function localUserKey() { return "nexus_local_user"; }
 function localConversationsKey() { return `nexus_conversations_${state.user?.id || "guest"}`; }
 function localSharesKey() { return "nexus_local_shares"; }
 function localQuickAccessKey() { return `nexus_quick_access_${state.user?.id || "guest"}`; }
+function localWorkShelfKey() { return `nexus_work_shelf_${state.user?.id || "guest"}`; }
 
 function getLocalJson(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); }
@@ -275,7 +281,9 @@ async function enterApp(user, options = {}) {
   updateUserCard();
   applyTheme(localStorage.getItem("nexus_theme") || "light");
   loadQuickAccess();
+  loadWorkShelf();
   renderQuickAccess();
+  renderWorkShelf();
 
   if (state.readOnlyShare) {
     renderHistory();
@@ -722,9 +730,147 @@ function insertQuickAccessNote(note) {
   showToast("Inserted into composer");
 }
 
+function workShelfPreview(text = "", max = 120) {
+  return String(text || "")
+    .replace(/#+\s*/g, "")
+    .replace(/[\n\r]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, max) || "Empty item";
+}
+
+function classifyWorkShelfItem(text = "", role = "assistant") {
+  const t = String(text || "").toLowerCase();
+  if (role === "user") return "case";
+  if (/\b(k\+?|potassium|creatinine|egfr|inr|alt|ast|hba1c|hb|platelets|labs?)\b|تحاليل|كرياتينين|بوتاسيوم|سيولة/.test(t)) return "lab/risk";
+  if (/red flag|urgent|emergency|bleeding|hyperkalemia|aki|toxicity|arrhythmia|نزيف|طارئ|خطير|سمية/.test(t)) return "risk";
+  if (/recommend|hold|avoid|monitor|contact|review|توصية|وقف|تجنب|تابع/.test(t)) return "recommendation";
+  if (/counsel|patient|explain|ask|educat|نصح|اسأل|المريض/.test(t)) return "counseling";
+  return "note";
+}
+
+function normalizeWorkShelfItem(item = {}) {
+  const content = String(item.content || "").trim();
+  const kind = String(item.kind || classifyWorkShelfItem(content, item.sourceRole)).slice(0, 28);
+  return {
+    id: item.id || uid("ws"),
+    kind,
+    content: content.slice(0, 5000),
+    sourceRole: item.sourceRole || "assistant",
+    created_at: item.created_at || nowIso()
+  };
+}
+
+function loadWorkShelf() {
+  if (!state.user) return;
+  state.workShelf = getLocalJson(localWorkShelfKey(), [])
+    .map(normalizeWorkShelfItem)
+    .filter(item => item.content)
+    .slice(0, MAX_WORK_SHELF_ITEMS);
+}
+
+function saveWorkShelf() {
+  if (!state.user) return;
+  setLocalJson(localWorkShelfKey(), state.workShelf.slice(0, MAX_WORK_SHELF_ITEMS));
+}
+
+function addWorkShelfItem(content = "", sourceRole = "assistant") {
+  const clean = String(content || "").trim();
+  if (!clean) return;
+  const item = normalizeWorkShelfItem({ content: clean, sourceRole });
+  state.workShelf.unshift(item);
+  state.workShelf = state.workShelf.slice(0, MAX_WORK_SHELF_ITEMS);
+  saveWorkShelf();
+  renderWorkShelf();
+  showToast("Added to Work Shelf");
+}
+
+function saveMessageToWorkShelf(row, role, content = "") {
+  const selected = getSelectedTextInside(row);
+  const bodyText = selected || String(content || "").trim();
+  if (!bodyText) return;
+  addWorkShelfItem(bodyText, role);
+}
+
+function deleteWorkShelfItem(id) {
+  state.workShelf = state.workShelf.filter(item => item.id !== id);
+  saveWorkShelf();
+  renderWorkShelf();
+  showToast("Removed from Work Shelf");
+}
+
+function clearWorkShelf() {
+  if (!state.workShelf.length) return;
+  if (!confirm("Clear all Work Shelf items?")) return;
+  state.workShelf = [];
+  saveWorkShelf();
+  renderWorkShelf();
+  showToast("Work Shelf cleared");
+}
+
+function renderWorkShelf() {
+  if (!els.workShelfList) return;
+  els.workShelfList.innerHTML = "";
+  if (els.workShelfCount) els.workShelfCount.textContent = `${state.workShelf.length} item${state.workShelf.length === 1 ? "" : "s"}`;
+
+  if (!state.workShelf.length) {
+    const empty = document.createElement("div");
+    empty.className = "work-empty";
+    empty.textContent = "Add key risks, labs, recommendations, or selected text here. Then generate a note, counseling script, prescriber message, or monitoring plan.";
+    els.workShelfList.appendChild(empty);
+    return;
+  }
+
+  state.workShelf.slice(0, 18).forEach(item => {
+    const node = document.createElement("article");
+    node.className = "work-item";
+    node.role = "listitem";
+    node.innerHTML = `
+      <div class="work-item-top">
+        <span class="work-kind">${escapeHtml(item.kind)}</span>
+        <button class="work-remove" type="button" aria-label="Remove item">×</button>
+      </div>
+      <div class="work-preview">${escapeHtml(workShelfPreview(item.content, 150))}</div>
+    `;
+    node.querySelector(".work-remove").addEventListener("click", () => deleteWorkShelfItem(item.id));
+    node.addEventListener("dblclick", () => {
+      const current = els.messageInput.value.trim();
+      els.messageInput.value = current ? `${current}\n\n${item.content}` : item.content;
+      autoGrow(els.messageInput);
+      els.messageInput.focus();
+      showToast("Shelf item inserted");
+    });
+    els.workShelfList.appendChild(node);
+  });
+}
+
+function buildWorkShelfPrompt(kind = "intervention_note") {
+  const labels = {
+    intervention_note: "pharmacist intervention note",
+    patient_counseling: "patient-friendly counseling script",
+    prescriber_message: "concise prescriber message",
+    monitoring_plan: "monitoring and follow-up plan"
+  };
+  const title = labels[kind] || "clinical summary";
+  const shelfBlock = state.workShelf.map((item, index) => `${index + 1}. [${item.kind}] ${item.content}`).join("\n\n");
+  return `Use the Work Shelf items below to generate a ${title}.\n\nRules:\n- Do not invent patient details not present in the shelf.\n- Separate urgent safety issues from routine recommendations.\n- Use safe pharmacist wording: recommend prescriber review for medication holds/changes when appropriate.\n- Mention missing critical information if it changes the decision.\n- Keep it practical and ready to copy.\n\nWork Shelf:\n${shelfBlock}`;
+}
+
+function generateFromWorkShelf(kind) {
+  if (!state.workShelf.length) return showToast("Add items to Work Shelf first.");
+  if (state.isGenerating || state.readOnlyShare) return;
+  const prompt = buildWorkShelfPrompt(kind);
+  const extra = els.messageInput.value.trim();
+  els.messageInput.value = extra ? `${prompt}\n\nExtra instruction from user:\n${extra}` : prompt;
+  autoGrow(els.messageInput);
+  selectMode("case_analysis", false);
+  els.chatForm.requestSubmit();
+}
+
 function renderAll() {
   renderHistory();
   renderQuickAccess();
+  renderWorkShelf();
   renderCurrentConversation();
 }
 
@@ -919,6 +1065,14 @@ function createMessageNode(role, content, options = {}) {
   quickBtn.title = "Save selected text or this message to My Quick Access";
   quickBtn.addEventListener("click", () => saveMessageToQuickAccess(row, role, role === "assistant" ? cleanContent : content));
   actions.appendChild(quickBtn);
+
+  const shelfBtn = document.createElement("button");
+  shelfBtn.type = "button";
+  shelfBtn.className = "message-action-btn save-shelf";
+  shelfBtn.textContent = "Shelf";
+  shelfBtn.title = "Add selected text or this message to Work Shelf";
+  shelfBtn.addEventListener("click", () => saveMessageToWorkShelf(row, role, role === "assistant" ? cleanContent : content));
+  actions.appendChild(shelfBtn);
 
   if (role === "user" && Number.isInteger(options.index) && !state.readOnlyShare) {
     const editBtn = document.createElement("button");
@@ -1856,6 +2010,10 @@ function bindEvents() {
   els.quickAccessSaveBtn?.addEventListener("click", saveQuickAccessFromModal);
   els.quickAccessCancelBtn?.addEventListener("click", closeQuickAccessModal);
   els.quickAccessDeleteBtn?.addEventListener("click", () => deleteQuickAccessNote());
+  els.workShelfClearBtn?.addEventListener("click", clearWorkShelf);
+  document.querySelectorAll("[data-work-generate]").forEach(btn => {
+    btn.addEventListener("click", () => generateFromWorkShelf(btn.dataset.workGenerate));
+  });
   els.quickAccessModal?.addEventListener("click", (event) => {
     if (event.target === els.quickAccessModal) closeQuickAccessModal();
   });
