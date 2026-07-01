@@ -4,7 +4,7 @@ const { localParseQuestion, inheritContextIfNeeded, getRecentContextText, inferM
 const { normalizeDrugList } = require('../lib/normalizer');
 const { retrieveEvidence, triageRisk } = require('../lib/engines');
 const { buildEvidenceBrief } = require('../lib/evidenceBrief');
-const { callFinalModel, relayNvidiaStream, localFallbackAnswer } = require('../lib/composer');
+const { callFinalModel, callSideAskModel, relayNvidiaStream, localFallbackAnswer } = require('../lib/composer');
 
 const MODE_LABELS = {
   general_chat: 'General Chat',
@@ -158,6 +158,26 @@ module.exports = async (req, res) => {
     if (!latestUserText) return res.status(400).json({ error: 'No user message found.' });
 
     const shouldStream = body.stream !== false;
+
+    if (body.sideAsk === true) {
+      const question = String(body.question || latestUserText || '').trim();
+      if (!question) return res.status(400).json({ error: 'No Side Ask question found.' });
+      try {
+        const upstream = await callSideAskModel({ question });
+        if (!upstream.ok) {
+          console.error('Side Ask provider failed', { status: upstream.status });
+          return res.status(502).json({ error: 'Side Ask could not generate a response. Please retry.' });
+        }
+        const data = await upstream.json();
+        const reply = data?.choices?.[0]?.message?.content || 'I could not answer that side question right now.';
+        res.setHeader('X-Nexus-Side-Ask', 'true');
+        return res.status(200).json({ mode: 'side_ask', risk: 'none', reply });
+      } catch (error) {
+        if (error.name === 'AbortError') return res.status(504).json({ error: 'Side Ask timed out. Try a shorter question.' });
+        throw error;
+      }
+    }
+
 
     if (isShortGreeting(latestUserText)) {
       const reply = greetingReply();
